@@ -16,9 +16,11 @@ def run_parser():
     """Run the linkedin_games_parser.py script to update CSV."""
     try:
         df = parse_whatsapp_chat(INPUT)  # returns DataFrame with correct columns
+        df.to_csv(PARSER_OUTPUT, index=False)
+        return True
     except Exception as e:
         raise (f"Error parsing chat: {e}")
-    return df
+    return False
 
 
 def time_to_seconds(time_str):

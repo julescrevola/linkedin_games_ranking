@@ -2,3 +2,6 @@
 data/
 *.txt
 *.csv
+
+# py cache
+src/__pycache__/
