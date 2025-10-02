@@ -93,5 +93,5 @@ if uploaded_file:
                         "min_play_time_mmss",
                         "ceo_percent",
                     ]
-                ]
+                ].reset_index(drop=True)
             )
