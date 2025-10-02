@@ -25,5 +25,10 @@ envc() {
     conda activate $ENV_NAME
 }
 
+envu() {
+    echo "Updating environment: $ENV_NAME from environment.yml"
+    conda env update -f environment.yml -n $ENV_NAME
+}
+
 # Export the function to make it available in the shell
 export -f envc
