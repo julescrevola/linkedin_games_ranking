@@ -33,6 +33,8 @@ pre-commit install
 
 ## Run the scripts
 
+### In local:
+
 To run the scripts, you have 2 options:
 - If you wish, you can first run the parser script from `src/` with (make sure that the input and output data paths are the right ones)
 ```bash
@@ -48,6 +50,12 @@ python ranking.py
 - Create leaderboards for each game for a specific day (**make sure to input the date in the format YYYY-MM-DD**):
 ```bash
 python ranking.py --day <YYYY-MM-DD>
+```
+### As a Streamlit app
+
+Run in your terminal:
+```bash
+streamlit run src/ranking_app.py
 ```
 
 **You are ready to create your own ranking!**
