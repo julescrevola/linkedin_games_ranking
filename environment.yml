@@ -3,5 +3,5 @@ dependencies:
   - python=3.11
   - pip
   - pip:
-      - pandas==2.0.3
+      - pandas==2.2.3
       - pre-commit==3.4.0
