@@ -1,2 +1,3 @@
-# linkedin_games_ranking
+# LinkedIn Games Ranking
+
 Ranking friends' scores on LinkedIn games.
