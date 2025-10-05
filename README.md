@@ -1,6 +1,7 @@
 # LinkedIn Games Ranking
 
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
+Find the published Streamlit app [here](https://linkedin-games-ranking.streamlit.app/).
 
 ## Clone repo
 
