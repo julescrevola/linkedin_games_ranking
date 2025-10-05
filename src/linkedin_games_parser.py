@@ -51,7 +51,10 @@ def parse_whatsapp_chat(
             if m:
                 # Start of a new message
                 date_str, _, sender, text = m.groups()
-                dt = datetime.strptime(date_str, "%d/%m/%Y").date()
+                if len(date_str.strip(" ")) == 8:
+                    dt = datetime.strptime(date_str, "%d/%m/%y").date()
+                else:
+                    dt = datetime.strptime(date_str, "%d/%m/%Y").date()
                 current_msg = {"date": dt, "sender": sender, "text": text}
 
                 # Try parsing game immediately
