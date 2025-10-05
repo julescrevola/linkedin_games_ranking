@@ -21,7 +21,7 @@ def parse_whatsapp_chat(
 
     # Regex patterns
     line_re = re.compile(
-        r"^\[(\d{2}/\d{2}/\d{4}) (\d{1,2}:\d{2}:\d{2})]\s(.*?):\s(.*)$"
+        r"^\[(\d{2}/\d{2}/\d{4}),? (\d{1,2}:\d{2}:\d{2})]\s(.*?):\s(.*)$"
     )
     game_re = re.compile(
         r"(?P<game>[A-Za-z\s]+)\s*#(?P<number>\d+)\s*\|\s*(?P<time>\d+:\d+).*",
