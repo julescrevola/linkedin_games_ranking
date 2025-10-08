@@ -1,5 +1,6 @@
 # linkedin_games_parser.py
 import re
+import unicodedata
 import pandas as pd
 from datetime import datetime
 
@@ -21,16 +22,17 @@ def parse_whatsapp_chat(
 
     # Regex patterns
     line_re = re.compile(
-        r"^\[(\d{2}/\d{2}/\d{2,4}),? (\d{1,2}:\d{2}:\d{2})]\s(.*?):\s(.*)$"
+        r"^\[(\d{2}/\d{2}/\d{2,4}),? (\d{1,2}:\d{2}:\d{2})]\s(.*?):\s([\s\S]*)$",
+        re.MULTILINE | re.DOTALL,
     )
     game_re = re.compile(
-        r"(?P<game>[A-Za-z\s]+)\s*#(?P<number>\d+)\s*\|\s*(?P<time>\d+:\d+).*",
-        re.IGNORECASE,
+        r"#?(?P<game>[A-Za-z\s]+)\s*#(?P<number>\d+)[(\s\n)\S\n]*?(?P<time>\d{1,2}:\d{2})",
+        re.IGNORECASE | re.UNICODE,
     )
-    ceo_re = re.compile(r"\s*(?P<percent>\d{1,3})%")
+    ceo_re = re.compile(r"\s*(?P<percent>\d{1,2})%")
 
     rows = []
-    current_msg = None
+    current_msg_lines = []
 
     # Check if input_source is a path or a file-like object
     if isinstance(input_path, str):
@@ -46,20 +48,54 @@ def parse_whatsapp_chat(
 
     try:
         for raw in f:
-            raw = raw.strip("\n")
-            m = line_re.match(raw)
-            if m:
-                # Start of a new message
-                date_str, _, sender, text = m.groups()
-                if len(date_str.strip(" ")) == 8:
-                    dt = datetime.strptime(date_str, "%d/%m/%y").date()
-                else:
-                    dt = datetime.strptime(date_str, "%d/%m/%Y").date()
-                current_msg = {"date": dt, "sender": sender, "text": text}
+            raw = raw.rstrip("\n")
+            raw = clean_line(raw)
 
-                # Try parsing game immediately
-                g = game_re.match(text)
-                ceo_match = ceo_re.search(text)
+            # Check if line starts a new message
+            if re.match(r"^\[(\d{2}/\d{2}/\d{2,4}),? (\d{1,2}:\d{2}:\d{2})]", raw):
+                if current_msg_lines:
+                    # Join previous message and parse
+                    full_msg = " ".join(current_msg_lines)
+                    m = line_re.search(full_msg)
+                    if m:
+                        date_str, _, sender, text = m.groups()
+                        dt = (
+                            datetime.strptime(date_str, "%d/%m/%y").date()
+                            if len(date_str) == 8
+                            else datetime.strptime(date_str, "%d/%m/%Y").date()
+                        )
+                        g = game_re.search(text)
+                        c = ceo_re.search(text)
+                        row = {
+                            "date": dt.isoformat(),
+                            "sender": sender,
+                            "text": text,
+                            "game": g.group("game").strip() if g else None,
+                            "game_number": g.group("number") if g else None,
+                            "play_time": g.group("time") if g else None,
+                            "ceo_percent": c.group("percent") if c else None,
+                        }
+                        rows.append(row)
+                    current_msg_lines = []
+
+                current_msg_lines.append(raw)
+            else:
+                # Continuation line of the current message
+                current_msg_lines.append(raw)
+
+        # Parse the last message after file ends
+        if current_msg_lines:
+            full_msg = " ".join(current_msg_lines)
+            m = line_re.search(full_msg)
+            if m:
+                date_str, _, sender, text = m.groups()
+                dt = (
+                    datetime.strptime(date_str, "%d/%m/%y").date()
+                    if len(date_str) == 8
+                    else datetime.strptime(date_str, "%d/%m/%Y").date()
+                )
+                g = game_re.search(text)
+                c = ceo_re.search(text)
                 row = {
                     "date": dt.isoformat(),
                     "sender": sender,
@@ -67,18 +103,16 @@ def parse_whatsapp_chat(
                     "game": g.group("game").strip() if g else None,
                     "game_number": g.group("number") if g else None,
                     "play_time": g.group("time") if g else None,
-                    "ceo_percent": ceo_match.group("percent") if ceo_match else None,
+                    "ceo_percent": c.group("percent") if c else None,
                 }
-                if g:
-                    rows.append(row)
-            else:
-                # Continuation of last message
-                if current_msg and rows:
-                    rows[-1]["text"] += " " + raw
-                    # Check for CEO percentage in continuation lines
-                    c = ceo_re.search(raw)
-                    if c:
-                        rows[-1]["ceo_percent"] = c.group("percent")
+                rows.append(row)
+
+            current_msg_lines = []
+
+            current_msg_lines.append(raw)
+        else:
+            # Continuation of last message — just append to current_msg_lines
+            current_msg_lines.append(raw)
 
     finally:
         if close_file:
@@ -105,6 +139,7 @@ def parse_whatsapp_chat(
             ],
         )
         .sort_values(by="date")
+        .dropna(subset=["game"])
         .reset_index(drop=True)
     )
 
@@ -114,3 +149,22 @@ def parse_whatsapp_chat(
         print(f"Extracted {len(df)} game results → {output_path}")
 
     return df
+
+
+###################### Tools ######################
+def clean_line(raw):
+    # Normalize unicode
+    raw = unicodedata.normalize("NFKC", raw)
+    # Remove invisible characters (common WhatsApp ones)
+    invisible_chars = [
+        "\u200e",  # LEFT-TO-RIGHT MARK
+        "\u200f",  # RIGHT-TO-LEFT MARK
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",  # Directional overrides
+    ]
+    for ch in invisible_chars:
+        raw = raw.replace(ch, "")
+    return raw

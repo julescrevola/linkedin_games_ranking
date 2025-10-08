@@ -30,5 +30,6 @@ envu() {
     conda env update -f environment.yml -n $ENV_NAME
 }
 
-# Export the function to make it available in the shell
+# Export the functions to make them available in the shell
 export -f envc
+export -f envu
