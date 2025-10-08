@@ -23,6 +23,7 @@ if uploaded_file:
             uploaded_file
         )  # returns DataFrame with correct columns
         st.success(f"Parsed {len(df)} game entries!")
+        df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
         st.dataframe(df)
     except Exception as e:
         st.error(f"Error parsing chat: {e}")
@@ -43,7 +44,7 @@ if uploaded_file:
         # --- Step 3: Compute per-game rankings ---
         st.subheader("Per-game Rankings")
         # Initialize final df for totals across all games
-        overall_best_sum = pd.DataFrame({"sender": filtered_df["sender"].unique()})
+        overall_best_sum = pd.DataFrame({"Player": filtered_df["sender"].unique()})
         for game in GAMES:
             game_df = filtered_df[
                 filtered_df["game"].str.lower() == game.lower()
@@ -61,7 +62,9 @@ if uploaded_file:
                 else:
                     return None
 
-            game_df["time_sec"] = game_df["play_time"].apply(time_to_seconds)
+            game_df["time_sec"] = (
+                game_df["play_time"].astype(str).apply(time_to_seconds)
+            )
             game_df["ceo_percent"] = pd.to_numeric(
                 game_df["ceo_percent"], errors="coerce"
             )
@@ -111,43 +114,54 @@ if uploaded_file:
             # Convert num_best to int
             merged["num_best"] = merged["num_best"].astype(int, errors="ignore")
 
+            # Rename and keep only relevant columns
+            merged = merged.rename(
+                columns={
+                    "sender": "Player",
+                    "avg_play_time_mmss": "Average Time",
+                    "min_play_time_mmss": "Minimum Time",
+                    "ceo_percent": "Average CEO %",
+                    "num_best": "Times N°1",
+                }
+            )
+
             # Add dataframe combining all times number of best times
             overall_best_sum = (
                 overall_best_sum.merge(
-                    merged[["sender", "num_best"]], on="sender", how="left"
+                    merged[["Player", "Times N°1"]], on="Player", how="left"
                 )
-                .fillna({"num_best": 0})
-                .rename(columns={"num_best": f"num_best_{game}"})
+                .fillna({"Times N°1": 0})
+                .rename(columns={"Times N°1": f"Times N°1 at {game}"})
             )
 
             st.markdown(f"**{game} Rankings**")
             st.dataframe(
                 merged[
                     [
-                        "sender",
-                        "avg_play_time_mmss",
-                        "min_play_time_mmss",
-                        "ceo_percent",
-                        "num_best",
+                        "Player",
+                        "Average Time",
+                        "Minimum Time",
+                        "Average CEO %",
+                        "Times N°1",
                     ]
                 ].reset_index(drop=True)
             )
 
         # Sum num_best across all games for overall ranking
-        overall_best_sum["num_best_total"] = (
+        overall_best_sum["Overall Times N°1"] = (
             overall_best_sum[
                 [
-                    f"num_best_{game}"
+                    f"Times N°1 at {game}"
                     for game in GAMES
-                    if f"num_best_{game}" in overall_best_sum.columns
+                    if f"Times N°1 at {game}" in overall_best_sum.columns
                 ]
             ]
             .sum(axis=1)
             .astype(int, errors="ignore")
         )
         overall_best_sum = (
-            overall_best_sum[["sender", "num_best_total"]]
-            .sort_values(by="num_best_total", ascending=False)
+            overall_best_sum[["Player", "Overall Times N°1"]]
+            .sort_values(by="Overall Times N°1", ascending=False)
             .reset_index(drop=True)
         )
 
