@@ -114,7 +114,6 @@ def streamlit_app(GAMES: list[str] = GAMES):
     overall_best_sum = pd.DataFrame({"Player": filtered_df["sender"].unique()})
 
     # ------------------- Per-game Rankings -------------------
-    st.subheader("Per-game Rankings")
     for game in GAMES:
         game_df = filtered_df[filtered_df["game"].str.lower() == game.lower()].copy()
         if game_df.empty:
@@ -243,7 +242,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
 
     # Add results to the dictionary
-    per_game_rankings["All"] = overall_best_sum
+    per_game_rankings["N°1"] = overall_best_sum
     per_game_rankings["Average Time per Game"] = daily_avg_times
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
