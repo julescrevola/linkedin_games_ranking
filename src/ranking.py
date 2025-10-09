@@ -242,7 +242,7 @@ def compute_per_game_rankings(file_path, day=None):
     )
 
     # Add overall summary to the dictionary
-    per_game_rankings["All"] = overall_best_sum
+    per_game_rankings["N°1"] = overall_best_sum
     per_game_rankings["Average Time per Game"] = daily_avg_times
     # Order total score
     total_score = (
