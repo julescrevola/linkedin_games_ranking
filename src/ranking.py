@@ -89,6 +89,8 @@ def compute_per_game_rankings(file_path, day=None):
     ].apply(lambda x: f"{int(x // 60)}:{int(x % 60):02d}")
     daily_avg_times["Total Time"] = daily_avg_times["Total Time (sec)"].apply(
         lambda x: f"{int(x // 3600)}:{int((x % 3600) // 60):02d}:{int(x % 60):02d}"
+        if not day
+        else f"{int(x // 60)}:{int(x % 60):02d}"
     )
 
     # Keep clean columns
@@ -102,13 +104,28 @@ def compute_per_game_rankings(file_path, day=None):
 
     per_game_rankings = {}
     overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
+    total_score = pd.DataFrame({"Player": df["sender"].unique(), "Total Score": 0})
 
     for game in GAMES:
         game_df = df[df["game"].str.lower() == game.lower()].copy()
         if game_df.empty:
             continue
 
-        # For each date, find the player(s) with the lowest time
+        # Update total score
+        score_map = {1: 5, 2: 2, 3: 1}
+        game_df["rank"] = game_df.groupby("date")["time_sec"].rank(method="min")
+        game_df["score"] = game_df["rank"].map(score_map).fillna(0)
+        score_sum = (
+            game_df.groupby("sender", as_index=False)["score"]
+            .sum()
+            .rename(columns={"sender": "Player"})
+            .fillna(0)
+        )
+        total_score = total_score.merge(score_sum, on="Player", how="left")
+        total_score["Total Score"] = total_score["Total Score"] + total_score["score"]
+        total_score = total_score.drop(columns=["score"])
+
+        # For each date, find the player with the lowest time
         best_per_day = (
             game_df.loc[
                 game_df.groupby("date")["time_sec"].idxmin(), ["date", "sender"]
@@ -121,9 +138,9 @@ def compute_per_game_rankings(file_path, day=None):
         # Compute average CEO percentage per player
         ceo_avg = game_df.groupby("sender", as_index=False)["ceo_percent"].mean()
 
-        # Compute avg times per player (if multiple plays, take the best time)
+        # Compute avg times per player
         avg_times = game_df.groupby("sender", as_index=False)["time_sec"].mean()
-        # Compute min times per player (if multiple plays, take the best time)
+        # Compute min times per player
         min_times = game_df.groupby("sender", as_index=False)["time_sec"].min()
 
         # Merge best times and CEO averages
@@ -227,15 +244,28 @@ def compute_per_game_rankings(file_path, day=None):
     # Add overall summary to the dictionary
     per_game_rankings["All"] = overall_best_sum
     per_game_rankings["Average Time per Game"] = daily_avg_times
+    # Order total score
+    total_score = (
+        total_score.sort_values(by="Total Score", ascending=False)
+        .reset_index(drop=True)
+        .fillna(0)
+    )
 
-    return per_game_rankings
+    return per_game_rankings, total_score
 
 
 def main(day=None):
     if not run_parser():
         return
 
-    per_game_rankings = compute_per_game_rankings(PARSER_OUTPUT, day=day)
+    per_game_rankings, total_score = compute_per_game_rankings(PARSER_OUTPUT, day=day)
+
+    print("\n=== Total Score Rankings ===")
+    print(total_score)
+    total_score.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_total_score_rankings.csv",
+        index=False,
+    )
 
     for game, df in per_game_rankings.items():
         print(f"\n=== {game} Rankings ===")

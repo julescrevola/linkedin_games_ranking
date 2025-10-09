@@ -3,6 +3,11 @@
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
 Find the published Streamlit app [here](https://linkedin-games-ranking.streamlit.app/).
 
+Total score are computed by awarding the following points, per game per day:
+- 5 points for the best player
+- 3 points for the second-best player
+- 1 point for the third-best player
+
 ## Clone repo
 
 You can clone this repo running:
