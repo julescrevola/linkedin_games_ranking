@@ -9,9 +9,23 @@ GAMES = ["Tango", "Queens", "Mini Sudoku", "Zip"]
 PARSER_SCRIPT = "linkedin_games_parser.py"  # Optional: can be run inside Streamlit
 OUTPUT_DIR = "../data/output"
 
+
+################################### Tools #########################################
+# Convert play_time to seconds
+def time_to_seconds(time_str):
+    parts = [int(p) for p in time_str.strip().split(":")]
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    elif len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    else:
+        return None
+
+
+############################### Streamlit App #####################################
 st.title("LinkedIn Mini Games Leaderboard")
 
-# --- Step 1: Upload WhatsApp chat ---
+# Upload WhatsApp chat
 uploaded_file = st.file_uploader(
     "Upload your WhatsApp chat (.txt format)", type=["txt"]
 )
@@ -30,7 +44,7 @@ if uploaded_file:
         df = None
 
     if df is not None and not df.empty:
-        # --- Step 2: Filter by day ---
+        # Filter by day
         st.subheader("Filter by day")
         unique_days = sorted(df["date"].unique(), reverse=True)
         day_filter = st.selectbox(
@@ -41,7 +55,67 @@ if uploaded_file:
         else:
             filtered_df = df
 
-        # --- Step 3: Compute per-game rankings ---
+        # Convert play_time to seconds
+        filtered_df["time_sec"] = (
+            filtered_df["play_time"].astype(str).apply(time_to_seconds)
+        )
+        filtered_df["ceo_percent"] = pd.to_numeric(
+            filtered_df["ceo_percent"], errors="coerce"
+        )
+
+        # Daily total time and normalized average
+        # Sum total time per player per day
+        daily_times = filtered_df.groupby(["date", "sender"], as_index=False)[
+            "time_sec"
+        ].sum()
+        daily_times = daily_times.rename(
+            columns={"sender": "Player", "time_sec": "Total Time (sec)"}
+        )
+
+        # Count total number of games played per player
+        games_played = (
+            filtered_df.groupby("sender", as_index=False)
+            .size()
+            .rename(columns={"size": "Games Played"})
+        )
+        games_played = games_played.rename(columns={"sender": "Player"})
+
+        # Compute total time across all days per player
+        total_time_all_days = daily_times.groupby("Player", as_index=False)[
+            "Total Time (sec)"
+        ].sum()
+
+        # Merge with number of games played
+        daily_avg_times = total_time_all_days.merge(
+            games_played, on="Player", how="left"
+        )
+
+        # Compute normalized average time (total_time / total_games)
+        daily_avg_times["Average Time per Game (sec)"] = (
+            daily_avg_times["Total Time (sec)"] / daily_avg_times["Games Played"]
+        ).round(2)
+
+        # Convert to mm:ss for readability
+        daily_avg_times["Average Time per Game"] = daily_avg_times[
+            "Average Time per Game (sec)"
+        ].apply(lambda x: f"{int(x // 60)}:{int(x % 60):02d}")
+        daily_avg_times["Total Time"] = daily_avg_times["Total Time (sec)"].apply(
+            lambda x: f"{int(x // 3600)}:{int((x % 3600) // 60):02d}:{int(x % 60):02d}"
+        )
+
+        # Keep clean columns
+        daily_avg_times = (
+            daily_avg_times[
+                ["Player", "Total Time", "Games Played", "Average Time per Game"]
+            ]
+            .sort_values(by="Average Time per Game")
+            .reset_index(drop=True)
+        )
+
+        per_game_rankings = {}
+        overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
+
+        # Compute per-game rankings
         st.subheader("Per-game Rankings")
         # Initialize final df for totals across all games
         overall_best_sum = pd.DataFrame({"Player": filtered_df["sender"].unique()})
@@ -52,24 +126,7 @@ if uploaded_file:
             if game_df.empty:
                 continue
 
-            # Convert play_time to seconds
-            def time_to_seconds(time_str):
-                parts = [int(p) for p in time_str.strip().split(":")]
-                if len(parts) == 2:
-                    return parts[0] * 60 + parts[1]
-                elif len(parts) == 3:
-                    return parts[0] * 3600 + parts[1] * 60 + parts[2]
-                else:
-                    return None
-
-            game_df["time_sec"] = (
-                game_df["play_time"].astype(str).apply(time_to_seconds)
-            )
-            game_df["ceo_percent"] = pd.to_numeric(
-                game_df["ceo_percent"], errors="coerce"
-            )
-
-            # For each date, find the player(s) with the lowest time
+            # For each date, find the player with the lowest time
             best_per_day = (
                 game_df.loc[
                     game_df.groupby("date")["time_sec"].idxmin(), ["date", "sender"]
@@ -118,20 +175,36 @@ if uploaded_file:
             merged = merged.rename(
                 columns={
                     "sender": "Player",
-                    "avg_play_time_mmss": "Average Time",
+                    "avg_play_time_mmss": "Average Time"
+                    if not day_filter != "All"
+                    else "Time",
                     "min_play_time_mmss": "Minimum Time",
-                    "ceo_percent": "Average CEO %",
-                    "num_best": "Times N°1",
+                    "ceo_percent": "Average CEO %"
+                    if not day_filter != "All"
+                    else "CEO %",
+                    "num_best": "Times N°1" if not day_filter != "All" else "N°1",
                 }
             )
 
             # Add dataframe combining all times number of best times
             overall_best_sum = (
                 overall_best_sum.merge(
-                    merged[["Player", "Times N°1"]], on="Player", how="left"
+                    merged[
+                        ["Player", "Times N°1" if not day_filter != "All" else "N°1"]
+                    ],
+                    on="Player",
+                    how="left",
                 )
-                .fillna({"Times N°1": 0})
-                .rename(columns={"Times N°1": f"Times N°1 at {game}"})
+                .fillna({"Times N°1" if not day_filter != "All" else "N°1": 0})
+                .rename(
+                    columns={
+                        "Times N°1"
+                        if not day_filter != "All"
+                        else "N°1": f"Times N°1 at {game}"
+                        if not day_filter != "All"
+                        else f"N°1 at {game}"
+                    }
+                )
             )
 
             st.markdown(f"**{game} Rankings**")
@@ -139,10 +212,10 @@ if uploaded_file:
                 merged[
                     [
                         "Player",
-                        "Average Time",
+                        "Average Time" if not day_filter != "All" else "Time",
                         "Minimum Time",
-                        "Average CEO %",
-                        "Times N°1",
+                        "Average CEO %" if not day_filter != "All" else "CEO %",
+                        "Times N°1" if not day_filter != "All" else "N°1",
                     ]
                 ].reset_index(drop=True)
             )
@@ -167,3 +240,7 @@ if uploaded_file:
 
         st.subheader("**Overall Times N°1 of each Game**")
         st.dataframe(overall_best_sum)
+
+        # Display average times per game
+        st.subheader("**Average Time per Game**")
+        st.dataframe(daily_avg_times)

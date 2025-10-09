@@ -2,7 +2,7 @@
 
 # Env name
 ENV_NAME="linkedin_games_ranking"
-# Define the envc command
+
 envc() {
     # Deactivate any currently active environment
     if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
@@ -30,6 +30,13 @@ envu() {
     conda env update -f environment.yml -n $ENV_NAME
 }
 
+enva() {
+    echo "Activating environment: $ENV_NAME"
+    conda deactivate
+    conda activate $ENV_NAME
+}
+
 # Export the functions to make them available in the shell
 export -f envc
 export -f envu
+export -f enva

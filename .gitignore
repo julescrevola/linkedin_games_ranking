@@ -3,6 +3,10 @@ data/
 *.txt
 *.csv
 
-# py cache
-src/__pycache__/
+# pycache
+src/__pycache__/linkedin_games_parser.cpython-311.pyc
+src/__pycache__/linkedin_games_parser.cpython-312.pyc
 *.pyc
+
+# ruff cache
+.ruff_cache/
