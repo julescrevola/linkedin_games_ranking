@@ -55,6 +55,51 @@ def compute_per_game_rankings(file_path, day=None):
     # Convert CEO percentage to numeric
     df["ceo_percent"] = pd.to_numeric(df["ceo_percent"], errors="coerce")
 
+    # Daily total time and normalized average
+    # Sum total time per player per day
+    daily_times = df.groupby(["date", "sender"], as_index=False)["time_sec"].sum()
+    daily_times = daily_times.rename(
+        columns={"sender": "Player", "time_sec": "Total Time (sec)"}
+    )
+
+    # Count total number of games played per player
+    games_played = (
+        df.groupby("sender", as_index=False)
+        .size()
+        .rename(columns={"size": "Games Played"})
+    )
+    games_played = games_played.rename(columns={"sender": "Player"})
+
+    # Compute total time across all days per player
+    total_time_all_days = daily_times.groupby("Player", as_index=False)[
+        "Total Time (sec)"
+    ].sum()
+
+    # Merge with number of games played
+    daily_avg_times = total_time_all_days.merge(games_played, on="Player", how="left")
+
+    # Compute normalized average time (total_time / total_games)
+    daily_avg_times["Average Time per Game (sec)"] = (
+        daily_avg_times["Total Time (sec)"] / daily_avg_times["Games Played"]
+    ).round(2)
+
+    # Convert to mm:ss for readability
+    daily_avg_times["Average Time per Game"] = daily_avg_times[
+        "Average Time per Game (sec)"
+    ].apply(lambda x: f"{int(x // 60)}:{int(x % 60):02d}")
+    daily_avg_times["Total Time"] = daily_avg_times["Total Time (sec)"].apply(
+        lambda x: f"{int(x // 3600)}:{int((x % 3600) // 60):02d}:{int(x % 60):02d}"
+    )
+
+    # Keep clean columns
+    daily_avg_times = (
+        daily_avg_times[
+            ["Player", "Total Time", "Games Played", "Average Time per Game"]
+        ]
+        .sort_values(by="Average Time per Game")
+        .reset_index(drop=True)
+    )
+
     per_game_rankings = {}
     overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
 
@@ -78,7 +123,6 @@ def compute_per_game_rankings(file_path, day=None):
 
         # Compute avg times per player (if multiple plays, take the best time)
         avg_times = game_df.groupby("sender", as_index=False)["time_sec"].mean()
-
         # Compute min times per player (if multiple plays, take the best time)
         min_times = game_df.groupby("sender", as_index=False)["time_sec"].min()
 
@@ -117,38 +161,58 @@ def compute_per_game_rankings(file_path, day=None):
         merged = merged.rename(
             columns={
                 "sender": "Player",
-                "avg_play_time_mmss": "Average Time",
+                "avg_play_time_mmss": "Average Time" if not day else "Time",
                 "min_play_time_mmss": "Minimum Time",
-                "ceo_percent": "Average CEO %",
-                "num_best": "Times N°1",
+                "ceo_percent": "Average CEO %" if not day else "CEO %",
+                "num_best": "Times N°1" if not day else "N°1",
             }
         )
-        per_game_rankings[game] = merged[
-            [
-                "Player",
-                "Average Time",
-                "Minimum Time",
-                "Average CEO %",
-                "Times N°1",
+
+        if not day:
+            per_game_rankings[game] = merged[
+                [
+                    "Player",
+                    "Average Time",
+                    "Minimum Time",
+                    "Average CEO %",
+                    "Times N°1",
+                ]
             ]
-        ]
+        else:
+            per_game_rankings[game] = merged[
+                [
+                    "Player",
+                    "Time",
+                    "CEO %",
+                    "N°1",
+                ]
+            ]
 
         # Add dataframe combining all times number of best times
         overall_best_sum = (
             overall_best_sum.merge(
-                merged[["Player", "Times N°1"]], on="Player", how="left"
+                merged[["Player", "Times N°1" if not day else "N°1"]],
+                on="Player",
+                how="left",
             )
-            .fillna({"Times N°1": 0})
-            .rename(columns={"Times N°1": f"Times N°1 at {game}"})
+            .fillna({"Times N°1" if not day else "N°1": 0})
+            .rename(
+                columns={
+                    "Times N°1" if not day else "N°1": f"Times N°1 at {game}"
+                    if not day
+                    else f"N°1 at {game}"
+                }
+            )
         )
 
     # Sum num_best across all games for overall ranking
     overall_best_sum["Overall Times N°1"] = (
         overall_best_sum[
             [
-                f"Times N°1 at {game}"
+                f"Times N°1 at {game}" if not day else f"N°1 at {game}"
                 for game in GAMES
                 if f"Times N°1 at {game}" in overall_best_sum.columns
+                or f"N°1 at {game}" in overall_best_sum.columns
             ]
         ]
         .sum(axis=1)
@@ -162,6 +226,7 @@ def compute_per_game_rankings(file_path, day=None):
 
     # Add overall summary to the dictionary
     per_game_rankings["All"] = overall_best_sum
+    per_game_rankings["Average Time per Game"] = daily_avg_times
 
     return per_game_rankings
 
