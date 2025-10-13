@@ -61,6 +61,13 @@ python ranking.py --day <YYYY-MM-DD>
 ```
 ### As a Streamlit app
 
+First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account.
+For instance:
+```toml
+SUPABASE_URL = "https://<something>.supabase.co"
+SUPABASE_KEY = "12345678"
+```
+
 Run in your terminal:
 ```bash
 streamlit run src/ranking_app.py
