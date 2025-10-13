@@ -1,11 +1,20 @@
 import streamlit as st
 import pandas as pd
+from supabase import create_client
 
-# Import your parser and ranking functions
+
+# Import parser
 from linkedin_games_parser import parse_whatsapp_chat
+
 
 # Constants
 GAMES = ["Tango", "Queens", "Mini Sudoku", "Zip"]
+
+# Set up Supabase
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase_cred = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 ################################### Tools #########################################
@@ -22,6 +31,21 @@ def time_to_seconds(time_str):
         return None
 
 
+# Load existing data from Supabase
+@st.cache_data
+def load_data_from_supabase():
+    result = (
+        supabase_cred.table("game_data")
+        .select("*")
+        .order("uploaded_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if result.data:
+        return pd.DataFrame(result.data[0]["data"])
+    return None
+
+
 ############################### Streamlit App #####################################
 def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
@@ -31,25 +55,57 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.title("LinkedIn Mini Games Leaderboard")
 
-    uploaded_file = st.file_uploader(
-        "Upload your WhatsApp chat (.txt format)", type=["txt"]
-    )
+    # Check if existing data exists
+    st.info("Checking for stored leaderboard data...")
+    existing = load_data_from_supabase()  # Should return a DataFrame or None
+    uploaded_file = None
+    df = None
 
-    if not uploaded_file:
-        st.info("Please upload a WhatsApp chat file to continue.")
-        return per_game_rankings, total_score
+    if existing is not None:
+        st.success(f"Found existing data from Supabase! ({len(existing)} entries)")
+        use_existing = st.radio(
+            "What would you like to do?",
+            ["Use Stored Data", "Upload New Data"],
+            horizontal=True,
+        )
 
-    st.info("Parsing WhatsApp chat...")
-    try:
-        df = parse_whatsapp_chat(uploaded_file)
-        st.success(f"Parsed {len(df)} game entries!")
-        df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
-    except Exception as e:
-        st.error(f"Error parsing chat: {e}")
-        return per_game_rankings, total_score
+        if use_existing == "Use Stored Data":
+            df = existing.copy()
+            st.success(f"Using stored data with {len(df)} entries.")
+        else:
+            uploaded_file = st.file_uploader(
+                "Upload new WhatsApp chat (.txt)", type=["txt"]
+            )
+    else:
+        st.info("No existing data found. Please upload a WhatsApp chat file.")
+        uploaded_file = st.file_uploader(
+            "Upload WhatsApp chat (.txt format)", type=["txt"]
+        )
 
-    if df.empty:
-        st.warning("No valid game entries found in this chat.")
+    # Parse and save new upload
+    if df is None and uploaded_file is not None:
+        try:
+            st.info("Parsing WhatsApp chat...")
+            df = parse_whatsapp_chat(uploaded_file)
+            st.success(f"Parsed {len(df)} game entries!")
+            df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
+
+            # Save parsed data to Supabase
+            st.info("Saving parsed data to Supabase...")
+            supabase_cred.table("game_data").insert(
+                {"data": df.to_dict(orient="records")}
+            ).execute()
+            st.success("Data saved to Supabase successfully!")
+
+        except Exception as e:
+            import traceback
+
+            st.error(f"Error parsing chat: {e}")
+            st.code(traceback.format_exc())
+            return per_game_rankings, total_score
+
+    if df is None:
+        st.warning("No data available. Please upload a WhatsApp chat file.")
         return per_game_rankings, total_score
 
     # ------------------- Filter by day -------------------

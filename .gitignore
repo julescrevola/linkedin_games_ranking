@@ -10,3 +10,6 @@ src/__pycache__/linkedin_games_parser.cpython-312.pyc
 
 # ruff cache
 .ruff_cache/
+
+# Supabase secrets
+.streamlit/secrets.toml
