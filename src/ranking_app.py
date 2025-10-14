@@ -115,6 +115,14 @@ def streamlit_app(GAMES: list[str] = GAMES):
         "Select day (or 'All' for overall)", options=["All"] + unique_days
     )
     filtered_df = df if day_filter == "All" else df[df["date"] == day_filter]
+    if day_filter == "All":
+        default_start_date = "2025-10-14"
+        day_from = st.selectbox(
+            "Select the day from which to start the overall ranking (Defaults to 2025-10-14)",
+            options=[default_start_date] + unique_days,
+        )
+        filtered_df = filtered_df[filtered_df["date"] >= day_from]
+        st.write(f"Showing {len(filtered_df)} entries starting from {day_from}")
 
     # ------------------- Preprocess -------------------
     filtered_df["time_sec"] = (
