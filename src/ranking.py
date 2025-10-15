@@ -82,6 +82,14 @@ def compute_per_game_rankings(file_path, day=None):
     daily_avg_times["Average Time per Game (sec)"] = (
         daily_avg_times["Total Time (sec)"] / daily_avg_times["Games Played"]
     ).round(2)
+    daily_avg_times["Total Time (sec)"] = daily_avg_times.apply(
+        lambda row: row["Total Time (sec)"]
+        if row["Games Played"] == daily_avg_times["Games Played"].max()
+        else (daily_avg_times["Games Played"].max() - row["Games Played"])
+        * row["Average Time per Game (sec)"]
+        + row["Total Time (sec)"],
+        axis=1,
+    )
 
     # Convert to mm:ss for readability
     daily_avg_times["Average Time per Game"] = daily_avg_times[
@@ -94,11 +102,15 @@ def compute_per_game_rankings(file_path, day=None):
     )
 
     # Keep clean columns
-    daily_avg_times = (
-        daily_avg_times[
-            ["Player", "Total Time", "Games Played", "Average Time per Game"]
-        ]
-        .sort_values(by="Average Time per Game")
+    final_daily_avg_times = (
+        daily_avg_times[["Player", "Games Played", "Average Time per Game"]]
+        .sort_values(by="Average Time per Game", ascending=True)
+        .reset_index(drop=True)
+    )
+
+    final_total_times = (
+        daily_avg_times[["Player", "Games Played", "Total Time"]]
+        .sort_values(by="Total Time", ascending=True)
         .reset_index(drop=True)
     )
 
@@ -112,7 +124,7 @@ def compute_per_game_rankings(file_path, day=None):
             continue
 
         # Update total score
-        score_map = {1: 5, 2: 2, 3: 1}
+        score_map = {1: 5, 2: 3, 3: 1}
         game_df["rank"] = game_df.groupby("date")["time_sec"].rank(method="min")
         game_df["score"] = game_df["rank"].map(score_map).fillna(0)
         score_sum = (
@@ -241,9 +253,6 @@ def compute_per_game_rankings(file_path, day=None):
         .reset_index(drop=True)
     )
 
-    # Add overall summary to the dictionary
-    per_game_rankings["N°1"] = overall_best_sum
-    per_game_rankings["Average Time per Game"] = daily_avg_times
     # Order total score
     total_score = (
         total_score.sort_values(by="Total Score", ascending=False)
@@ -251,22 +260,55 @@ def compute_per_game_rankings(file_path, day=None):
         .fillna(0)
     )
 
-    return per_game_rankings, total_score
+    return (
+        per_game_rankings,
+        total_score,
+        final_total_times,
+        final_daily_avg_times,
+        overall_best_sum,
+    )
 
 
 def main(day=None):
     if not run_parser():
         return
 
-    per_game_rankings, total_score = compute_per_game_rankings(PARSER_OUTPUT, day=day)
-
+    (
+        per_game_rankings,
+        total_score,
+        final_total_times,
+        final_daily_avg_times,
+        overall_best_sum,
+    ) = compute_per_game_rankings(PARSER_OUTPUT, day=day)
+    # Total score
     print("\n=== Total Score Rankings ===")
     print(total_score)
     total_score.to_csv(
         f"../data/output/{day if day is not None else 'overall'}_total_score_rankings.csv",
         index=False,
     )
-
+    # Total times
+    print("\n=== Total Times Rankings ===")
+    print(final_total_times)
+    final_total_times.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_total_times_rankings.csv",
+        index=False,
+    )
+    # Average times
+    print("\n=== Average Times per Game Rankings ===")
+    print(final_daily_avg_times)
+    final_daily_avg_times.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_average_times_rankings.csv",
+        index=False,
+    )
+    # Overall times N°1
+    print("\n=== Overall Times N°1 Rankings ===")
+    print(overall_best_sum)
+    overall_best_sum.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_overall_times_n1_rankings.csv",
+        index=False,
+    )
+    # Per game rankings
     for game, df in per_game_rankings.items():
         print(f"\n=== {game} Rankings ===")
         print(df)

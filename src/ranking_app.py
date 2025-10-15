@@ -132,7 +132,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         filtered_df["ceo_percent"], errors="coerce"
     )
 
-    # ------------------- Compute average times -------------------
+    # ------------------- Compute total and average times for all games together -------------------
     daily_times = filtered_df.groupby(["date", "sender"], as_index=False)[
         "time_sec"
     ].sum()
@@ -153,6 +153,14 @@ def streamlit_app(GAMES: list[str] = GAMES):
     daily_avg_times["Average Time per Game (sec)"] = (
         daily_avg_times["Total Time (sec)"] / daily_avg_times["Games Played"]
     ).round(2)
+    daily_avg_times["Total Time (sec)"] = daily_avg_times.apply(
+        lambda row: row["Total Time (sec)"]
+        if row["Games Played"] == daily_avg_times["Games Played"].max()
+        else (daily_avg_times["Games Played"].max() - row["Games Played"])
+        * row["Average Time per Game (sec)"]
+        + row["Total Time (sec)"],
+        axis=1,
+    )
 
     daily_avg_times["Average Time per Game"] = daily_avg_times[
         "Average Time per Game (sec)"
@@ -163,11 +171,15 @@ def streamlit_app(GAMES: list[str] = GAMES):
         else f"{int(x // 60)}:{int(x % 60):02d}"
     )
 
-    daily_avg_times = (
-        daily_avg_times[
-            ["Player", "Total Time", "Games Played", "Average Time per Game"]
-        ]
-        .sort_values(by="Average Time per Game")
+    final_daily_avg_times = (
+        daily_avg_times[["Player", "Games Played", "Average Time per Game"]]
+        .sort_values(by="Average Time per Game", ascending=True)
+        .reset_index(drop=True)
+    )
+
+    final_total_times = (
+        daily_avg_times[["Player", "Games Played", "Total Time"]]
+        .sort_values(by="Total Time", ascending=True)
         .reset_index(drop=True)
     )
 
@@ -305,29 +317,57 @@ def streamlit_app(GAMES: list[str] = GAMES):
         .reset_index(drop=True)
     )
 
-    # Add results to the dictionary
-    per_game_rankings["N°1"] = overall_best_sum
-    per_game_rankings["Average Time per Game"] = daily_avg_times
+    # Sort total scores
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
     ).reset_index(drop=True)
 
-    return per_game_rankings, total_score
+    return (
+        per_game_rankings,
+        total_score,
+        final_total_times,
+        final_daily_avg_times,
+        overall_best_sum,
+    )
 
 
 ############################### Main #####################################
 def main():
-    per_game_rankings, total_score = streamlit_app(GAMES=GAMES)
+    (
+        per_game_rankings,
+        total_score,
+        final_total_times,
+        final_daily_avg_times,
+        overall_best_sum,
+    ) = streamlit_app(GAMES=GAMES)
 
     if not per_game_rankings:
         return
 
-    st.subheader("**Total Scores**")
-    st.dataframe(total_score)
-    st.markdown(
-        "_Note: Total scores are computed by awarding 5 points for the best player, "
-        "3 points for the second-best player, and 1 point for the third-best player, per game per day._"
+    ranking_type = st.radio(
+        "What kind of ranking would you like to see?",
+        ["Total Points", "Total Time", "Average Time", "Times N°1"],
+        horizontal=True,
     )
+    if ranking_type == "Total Points":
+        st.subheader("**Total Scores**")
+        st.dataframe(total_score)
+        st.markdown(
+            "_Note: Total scores are computed by awarding 5 points for the best player, "
+            "3 points for the second-best player, and 1 point for the third-best player, per game per day._"
+        )
+    elif ranking_type == "Total Time":
+        st.subheader("**Total Times**")
+        st.dataframe(final_total_times)
+        st.markdown(
+            "_Note: For players who did not play all games, their total time has been adjusted as if they had played all games at their average time._"
+        )
+    elif ranking_type == "Average Time":
+        st.subheader("**Average Times per Game**")
+        st.dataframe(final_daily_avg_times)
+    elif ranking_type == "Times N°1":
+        st.subheader("**Overall Times N°1**")
+        st.dataframe(overall_best_sum)
 
     for title, df in per_game_rankings.items():
         st.markdown(f"**{title} Rankings**")
