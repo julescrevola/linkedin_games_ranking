@@ -51,6 +51,9 @@ def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
     per_game_rankings = {}
     total_score = pd.DataFrame(columns=["Player", "Total Score"])
+    final_total_times = pd.DataFrame()
+    final_daily_avg_times = pd.DataFrame()
+    overall_best_sum = pd.DataFrame()
     day_filter = "All"
 
     st.title("LinkedIn Mini Games Leaderboard")
@@ -96,6 +99,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
                 {"data": df.to_dict(orient="records")}
             ).execute()
             st.success("Data saved to Supabase successfully!")
+            load_data_from_supabase.clear()
 
         except Exception as e:
             import traceback
@@ -106,7 +110,13 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     if df is None:
         st.warning("No data available. Please upload a WhatsApp chat file.")
-        return per_game_rankings, total_score
+        return (
+            per_game_rankings,
+            total_score,
+            final_total_times,
+            final_daily_avg_times,
+            overall_best_sum,
+        )
 
     # ------------------- Filter by day -------------------
     st.subheader("Filter by day")
