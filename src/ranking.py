@@ -198,24 +198,32 @@ def compute_per_game_rankings(file_path, day=None):
         )
 
         if not day:
-            per_game_rankings[game] = merged[
-                [
-                    "Player",
-                    "Average Time",
-                    "Minimum Time",
-                    "Average CEO %",
-                    "Times N°1",
+            per_game_rankings[game] = (
+                merged[
+                    [
+                        "Player",
+                        "Average Time",
+                        "Minimum Time",
+                        "Average CEO %",
+                        "Times N°1",
+                    ]
                 ]
-            ]
+                .sort_values(by="Times N°1", ascending=False)
+                .reset_index(drop=True)
+            )
         else:
-            per_game_rankings[game] = merged[
-                [
-                    "Player",
-                    "Time",
-                    "CEO %",
-                    "N°1",
+            per_game_rankings[game] = (
+                merged[
+                    [
+                        "Player",
+                        "Time",
+                        "CEO %",
+                        "N°1",
+                    ]
                 ]
-            ]
+                .sort_values(by="Time", ascending=True)
+                .reset_index(drop=True)
+            )
 
         # Add dataframe combining all times number of best times
         overall_best_sum = (

@@ -268,40 +268,48 @@ def streamlit_app(GAMES: list[str] = GAMES):
             }
         )
 
-        if not day_filter != "All":
-            per_game_rankings[game] = merged[
-                [
-                    "Player",
-                    "Average Time",
-                    "Minimum Time",
-                    "Average CEO %",
-                    "Times N°1",
+        if day_filter == "All":
+            per_game_rankings[game] = (
+                merged[
+                    [
+                        "Player",
+                        "Average Time",
+                        "Minimum Time",
+                        "Average CEO %",
+                        "Times N°1",
+                    ]
                 ]
-            ]
+                .sort_values(by="Times N°1", ascending=False)
+                .reset_index(drop=True)
+            )
         else:
-            per_game_rankings[game] = merged[
-                [
-                    "Player",
-                    "Time",
-                    "CEO %",
-                    "N°1",
+            per_game_rankings[game] = (
+                merged[
+                    [
+                        "Player",
+                        "Time",
+                        "CEO %",
+                        "N°1",
+                    ]
                 ]
-            ]
+                .sort_values(by="Time", ascending=True)
+                .reset_index(drop=True)
+            )
 
         # Add dataframe combining all times number of best times
         overall_best_sum = (
             overall_best_sum.merge(
-                merged[["Player", "Times N°1" if not day_filter != "All" else "N°1"]],
+                merged[["Player", "Times N°1" if day_filter == "All" else "N°1"]],
                 on="Player",
                 how="left",
             )
-            .fillna({"Times N°1" if not day_filter != "All" else "N°1": 0})
+            .fillna({"Times N°1" if day_filter == "All" else "N°1": 0})
             .rename(
                 columns={
                     "Times N°1"
-                    if not day_filter != "All"
+                    if day_filter == "All"
                     else "N°1": f"Times N°1 at {game}"
-                    if not day_filter != "All"
+                    if day_filter == "All"
                     else f"N°1 at {game}"
                 }
             )
@@ -312,7 +320,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     overall_best_sum["Overall Times N°1"] = (
         overall_best_sum[
             [
-                f"Times N°1 at {game}" if not day_filter != "All" else f"N°1 at {game}"
+                f"Times N°1 at {game}" if day_filter == "All" else f"N°1 at {game}"
                 for game in GAMES
                 if f"Times N°1 at {game}" in overall_best_sum.columns
                 or f"N°1 at {game}" in overall_best_sum.columns
