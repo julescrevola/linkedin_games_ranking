@@ -11,6 +11,13 @@ Total score are computed by awarding the following points, per game per day:
 - 3 points for the second-best player
 - 1 point for the third-best player
 
+The sum of points must always be 9, so draws are dealt with in the following way:
+- If the ranking is 1-1-1, then each player gets (5+3+1)/3 = 3
+- If the ranking is 1-1-3, then the first two players get (5+3)/2 = 4 each, the third gets 1
+- If the ranking is 1-2-2, then the first player gets 5 and the next two players get (3+1)/2 = 2 each
+- If the ranking is 1-2-2-2, then the first player gets 5 and the next players get (3+1)/3 = 1.33 each
+And so on.
+
 ## Clone repo
 
 You can clone this repo running:

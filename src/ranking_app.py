@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -8,7 +9,7 @@ from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
-GAMES = ["Tango", "Queens", "Mini Sudoku", "Zip"]
+GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku"]
 
 # Set up Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -118,6 +119,22 @@ def streamlit_app(GAMES: list[str] = GAMES):
             overall_best_sum,
         )
 
+    # Hard code unsaved results for Samuele on 2025-10-17 for Queens
+    # Regex pattern — case-insensitive search for 'samu'
+    pattern = re.compile(r"samu", re.IGNORECASE)
+    # Find name that matches
+    match = [name for name in df["sender"].unique() if pattern.search(name)][0].title()
+    unsaved_data = pd.DataFrame(
+        {
+            "date": ["2025-10-17"],
+            "game": ["Queens"],
+            "sender": [match],
+            "play_time": ["1:45"],
+            "ceo_percent": None,
+        }
+    )
+    df = pd.concat([df, unsaved_data], ignore_index=True)
+
     # ------------------- Filter by day -------------------
     st.subheader("Filter by day")
     unique_days = sorted(df["date"].unique(), reverse=True)
@@ -196,19 +213,61 @@ def streamlit_app(GAMES: list[str] = GAMES):
     # ------------------- Initialize scores -------------------
     total_score = pd.DataFrame(
         {"Player": filtered_df["sender"].unique(), "Total Score": 0}
-    )
+    ).merge(games_played, on="Player", how="left")
     overall_best_sum = pd.DataFrame({"Player": filtered_df["sender"].unique()})
 
     # ------------------- Per-game Rankings -------------------
     for game in GAMES:
         game_df = filtered_df[filtered_df["game"].str.lower() == game.lower()].copy()
         if game_df.empty:
+            st.info(f"No data for game: {game}")
             continue
 
         # Rank players by time
         score_map = {1: 5, 2: 3, 3: 1}
         game_df["rank"] = game_df.groupby("date")["time_sec"].rank(method="min")
-        game_df["score"] = game_df["rank"].map(score_map).fillna(0)
+        game_df["score"] = game_df["rank"].map(score_map).fillna(0).astype(float)
+        success_list = []
+        for date in game_df["date"].unique():
+            date_df = game_df[game_df["date"] == date]
+            if date_df["score"].sum() != 9:
+                dict_scores = date_df["score"].value_counts().to_dict().items()
+                for key, val in dict_scores:
+                    if key == 5 and val == 2:
+                        game_df.loc[
+                            (game_df["date"] == date) & (game_df["score"] == key),
+                            "score",
+                        ] = 4
+                    elif key == 5 and val > 2:
+                        game_df.loc[
+                            (game_df["date"] == date) & (game_df["score"] == key),
+                            "score",
+                        ] = 9 / val
+                    elif key == 3 and val > 1:
+                        game_df.loc[
+                            (game_df["date"] == date) & (game_df["score"] == key),
+                            "score",
+                        ] = 4 / val
+                    elif key == 1 and val > 1:
+                        game_df.loc[
+                            (game_df["date"] == date) & (game_df["score"] == key),
+                            "score",
+                        ] = 1 / val
+            if (
+                (game_df[game_df["date"] == date]["score"].sum() == 9)
+                or (
+                    len(date_df) == 2
+                    and game_df[game_df["date"] == date]["score"].sum() == 8
+                )
+                or (
+                    len(date_df) == 1
+                    and game_df[game_df["date"] == date]["score"].sum() == 5
+                )
+                or (len(date_df) == 0)
+            ):
+                success_list.append(True)
+        if len(success_list) == len(game_df["date"].unique()):
+            st.success(f"Scores computed successfully for {game}!")
 
         # Update total score
         score_sum = (
@@ -236,11 +295,15 @@ def streamlit_app(GAMES: list[str] = GAMES):
         avg_times = game_df.groupby("sender", as_index=False)["time_sec"].mean()
         min_times = game_df.groupby("sender", as_index=False)["time_sec"].min()
         ceo_avg = game_df.groupby("sender", as_index=False)["ceo_percent"].mean()
+        score_sum_copy = (
+            game_df.groupby("sender", as_index=False)["score"].sum().fillna(0)
+        )
 
         merged = (
             avg_times.merge(ceo_avg, on="sender")
             .merge(min_times, on="sender", suffixes=("_avg", "_min"))
             .merge(best_per_day, on="sender", how="left")
+            .merge(score_sum_copy, on="sender", how="left")
             .fillna({"num_best": 0})
         )
 
@@ -257,6 +320,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         )
         merged["ceo_percent"] = merged["ceo_percent"].round(2)
         merged["num_best"] = merged["num_best"].astype(int, errors="ignore")
+        merged["score"] = merged["score"].astype(float, errors="ignore").round(1)
 
         merged = merged.rename(
             columns={
@@ -277,10 +341,12 @@ def streamlit_app(GAMES: list[str] = GAMES):
                         "Minimum Time",
                         "Average CEO %",
                         "Times N°1",
+                        "score",
                     ]
                 ]
                 .sort_values(by="Times N°1", ascending=False)
                 .reset_index(drop=True)
+                .rename(columns={"score": "Total Score"})
             )
         else:
             per_game_rankings[game] = (
@@ -290,10 +356,12 @@ def streamlit_app(GAMES: list[str] = GAMES):
                         "Time",
                         "CEO %",
                         "N°1",
+                        "score",
                     ]
                 ]
                 .sort_values(by="Time", ascending=True)
                 .reset_index(drop=True)
+                .rename(columns={"score": "Score"})
             )
 
         # Add dataframe combining all times number of best times
@@ -329,13 +397,16 @@ def streamlit_app(GAMES: list[str] = GAMES):
         .sum(axis=1)
         .astype(int, errors="ignore")
     )
-    overall_best_sum = (
-        overall_best_sum[["Player", "Overall Times N°1"]]
-        .sort_values(by="Overall Times N°1", ascending=False)
-        .reset_index(drop=True)
-    )
+    col_overall = overall_best_sum.pop("Overall Times N°1")
+    overall_best_sum.insert(1, "Overall Times N°1", col_overall)
+    overall_best_sum = overall_best_sum.sort_values(
+        by="Overall Times N°1", ascending=False
+    ).reset_index(drop=True)
 
     # Sort total scores
+    col_games_played = total_score.pop("Games Played")
+    total_score.insert(1, "Games Played", col_games_played)
+    total_score["Total Score"] = total_score["Total Score"].round(1)
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
     ).reset_index(drop=True)
