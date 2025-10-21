@@ -203,12 +203,14 @@ def streamlit_app(GAMES: list[str] = GAMES):
         .sort_values(by="Average Time per Game", ascending=True)
         .reset_index(drop=True)
     )
+    final_daily_avg_times.index += 1
 
     final_total_times = (
         daily_avg_times[["Player", "Games Played", "Total Time"]]
         .sort_values(by="Total Time", ascending=True)
         .reset_index(drop=True)
     )
+    final_total_times.index += 1
 
     # ------------------- Initialize scores -------------------
     total_score = pd.DataFrame(
@@ -254,7 +256,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
                             "score",
                         ] = 1 / val
             if (
-                (game_df[game_df["date"] == date]["score"].sum() == 9)
+                (9 <= game_df[game_df["date"] == date]["score"].sum() <= 9.00001)
                 or (
                     len(date_df) == 2
                     and game_df[game_df["date"] == date]["score"].sum() == 8
@@ -320,7 +322,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         )
         merged["ceo_percent"] = merged["ceo_percent"].round(2)
         merged["num_best"] = merged["num_best"].astype(int, errors="ignore")
-        merged["score"] = merged["score"].astype(float, errors="ignore").round(1)
+        merged["score"] = merged["score"].astype(float, errors="ignore").round(2)
 
         merged = merged.rename(
             columns={
@@ -333,7 +335,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         )
 
         if day_filter == "All":
-            per_game_rankings[game] = (
+            merged_final = (
                 merged[
                     [
                         "Player",
@@ -348,8 +350,10 @@ def streamlit_app(GAMES: list[str] = GAMES):
                 .reset_index(drop=True)
                 .rename(columns={"score": "Total Score"})
             )
+            merged_final.index += 1
+            per_game_rankings[game] = merged_final
         else:
-            per_game_rankings[game] = (
+            merged_final = (
                 merged[
                     [
                         "Player",
@@ -363,6 +367,8 @@ def streamlit_app(GAMES: list[str] = GAMES):
                 .reset_index(drop=True)
                 .rename(columns={"score": "Score"})
             )
+            merged_final.index += 1
+            per_game_rankings[game] = merged_final
 
         # Add dataframe combining all times number of best times
         overall_best_sum = (
@@ -402,14 +408,16 @@ def streamlit_app(GAMES: list[str] = GAMES):
     overall_best_sum = overall_best_sum.sort_values(
         by="Overall Times N°1", ascending=False
     ).reset_index(drop=True)
+    overall_best_sum.index += 1
 
     # Sort total scores
     col_games_played = total_score.pop("Games Played")
     total_score.insert(1, "Games Played", col_games_played)
-    total_score["Total Score"] = total_score["Total Score"].round(1)
+    total_score["Total Score"] = total_score["Total Score"].round(2)
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
     ).reset_index(drop=True)
+    total_score.index += 1
 
     return (
         per_game_rankings,
