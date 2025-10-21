@@ -466,6 +466,7 @@ def main():
         st.subheader("**Overall Times N°1**")
         st.dataframe(overall_best_sum)
 
+    st.subheader("**Per-Game Rankings**")
     for title, df in per_game_rankings.items():
         st.markdown(f"**{title} Rankings**")
         st.dataframe(df)
