@@ -10,7 +10,7 @@ INPUT = "../data/input/_chat_fr.txt"
 PARSER_OUTPUT = "../data/output/games_leaderboard.csv"
 
 # List of known games
-GAMES = ["Tango", "Queens", "Mini Sudoku", "Zip"]
+GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku"]
 
 
 def run_parser():
@@ -125,12 +125,14 @@ def compute_per_game_rankings(file_path, day=None):
         .sort_values(by="Average Time per Game", ascending=True)
         .reset_index(drop=True)
     )
+    final_daily_avg_times.index += 1
 
     final_total_times = (
         daily_avg_times[["Player", "Games Played", "Total Time"]]
         .sort_values(by="Total Time", ascending=True)
         .reset_index(drop=True)
     )
+    final_total_times.index += 1
 
     per_game_rankings = {}
     overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
@@ -139,7 +141,7 @@ def compute_per_game_rankings(file_path, day=None):
     ).merge(games_played, on="Player", how="left")
 
     for game in GAMES:
-        game_df = df[df["game"].str.lower() == game.lower()].copy()
+        game_df = df[df["game"].str.lower() == game.lower()]
         if game_df.empty:
             print(f"No data for game: {game}")
             continue
@@ -175,7 +177,7 @@ def compute_per_game_rankings(file_path, day=None):
                             "score",
                         ] = 1 / val
             if (
-                (game_df[game_df["date"] == date]["score"].sum() == 9)
+                (9 <= game_df[game_df["date"] == date]["score"].sum() <= 9.00001)
                 or (
                     len(date_df) == 2
                     and game_df[game_df["date"] == date]["score"].sum() == 8
@@ -184,7 +186,7 @@ def compute_per_game_rankings(file_path, day=None):
                     len(date_df) == 1
                     and game_df[game_df["date"] == date]["score"].sum() == 5
                 )
-                or (len(date_df) == 0)
+                or (date_df.empty)
             ):
                 success_list.append(True)
         if len(success_list) == len(game_df["date"].unique()):
@@ -253,8 +255,8 @@ def compute_per_game_rankings(file_path, day=None):
         merged["ceo_percent"] = merged["ceo_percent"].round(2)
         # Convert num_best to int
         merged["num_best"] = merged["num_best"].astype(int, errors="ignore")
-        # Round score to 1 decimal
-        merged["score"] = merged["score"].astype(float, errors="ignore").round(1)
+        # Round score to 2 decimals
+        merged["score"] = merged["score"].astype(float, errors="ignore").round(2)
 
         # Rename and keep only relevant columns
         merged = merged.rename(
@@ -268,7 +270,7 @@ def compute_per_game_rankings(file_path, day=None):
         )
 
         if not day:
-            per_game_rankings[game] = (
+            merged_final = (
                 merged[
                     [
                         "Player",
@@ -283,13 +285,17 @@ def compute_per_game_rankings(file_path, day=None):
                 .reset_index(drop=True)
                 .rename(columns={"score": "Total Score"})
             )
+            merged_final.index += 1
+            per_game_rankings[game] = merged_final
         else:
-            per_game_rankings[game] = (
+            merged_final = (
                 merged[["Player", "Time", "CEO %", "N°1", "score"]]
                 .sort_values(by="Time", ascending=True)
                 .reset_index(drop=True)
                 .rename(columns={"score": "Score"})
             )
+            merged_final.index += 1
+            per_game_rankings[game] = merged_final
 
         # Add dataframe combining all times number of best times
         overall_best_sum = (
@@ -326,16 +332,18 @@ def compute_per_game_rankings(file_path, day=None):
     overall_best_sum = overall_best_sum.sort_values(
         by="Overall Times N°1", ascending=False
     ).reset_index(drop=True)
+    overall_best_sum.index += 1
 
     # Order total score
     col_games_played = total_score.pop("Games Played")
     total_score.insert(1, "Games Played", col_games_played)
-    total_score["Total Score"] = total_score["Total Score"].round(1)
+    total_score["Total Score"] = total_score["Total Score"].round(2)
     total_score = (
         total_score.sort_values(by="Total Score", ascending=False)
         .reset_index(drop=True)
         .fillna(0)
     )
+    total_score.index += 1
 
     return (
         per_game_rankings,
