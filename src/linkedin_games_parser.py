@@ -26,7 +26,7 @@ def parse_whatsapp_chat(
         re.MULTILINE | re.DOTALL,
     )
     game_re = re.compile(
-        r"#?(?P<game>[A-Za-z\s]+)\s*#(?P<number>\d+)[(\s\n)\S\n]*?(?P<time>\d{1,2}:\d{2})",
+        r"#?(?P<game>[A-Za-z\s]+)\s*?(#|No\.)\s*?(?P<number>\d+)[(\s\n)\S\n]*?(?P<time>\d{1,2}:\d{2})",
         re.IGNORECASE | re.UNICODE,
     )
     ceo_re = re.compile(r"\s*(?P<percent>\d{1,2})%[\s\S]*(CEOs|CEO|PDG)")
