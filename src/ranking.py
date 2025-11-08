@@ -134,6 +134,25 @@ def compute_per_game_rankings(file_path, day=None):
     )
     final_total_times.index += 1
 
+    # Compute variance for all games together
+    variance_df = df.merge(
+        df.groupby(["date", "sender"], as_index=False)["time_sec"].mean(),
+        suffixes=("", "_avg"),
+        on=["date", "sender"],
+        how="left",
+    )
+    variance_df["mean_diff"] = abs(
+        variance_df["time_sec"] - variance_df["time_sec_avg"]
+    ).round(2)
+    variance_summary = (
+        variance_df.groupby("sender", as_index=False)["mean_diff"]
+        .mean()
+        .rename(columns={"sender": "Player", "mean_diff": "Variance"})
+        .sort_values(by="Variance", ascending=True)
+        .reset_index(drop=True)
+    )
+    variance_summary.index += 1
+
     per_game_rankings = {}
     overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
     total_score = pd.DataFrame(
@@ -350,6 +369,7 @@ def compute_per_game_rankings(file_path, day=None):
         total_score,
         final_total_times,
         final_daily_avg_times,
+        variance_summary,
         overall_best_sum,
     )
 
@@ -363,6 +383,7 @@ def main(day=None):
         total_score,
         final_total_times,
         final_daily_avg_times,
+        variance_summary,
         overall_best_sum,
     ) = compute_per_game_rankings(PARSER_OUTPUT, day=day)
     # Total score
@@ -391,6 +412,13 @@ def main(day=None):
     print(overall_best_sum)
     overall_best_sum.to_csv(
         f"../data/output/{day if day is not None else 'overall'}_overall_times_n1_rankings.csv",
+        index=False,
+    )
+    # Overall Variance
+    print("\n=== Overall Variance Rankings ===")
+    print(variance_summary)
+    variance_summary.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_overall_variance_rankings.csv",
         index=False,
     )
     # Per game rankings

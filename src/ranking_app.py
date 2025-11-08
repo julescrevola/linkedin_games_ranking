@@ -212,6 +212,25 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
     final_total_times.index += 1
 
+    # ------------------- Compute variance for all games together -------------------
+    variance_df = filtered_df.merge(
+        filtered_df.groupby(["date", "sender"], as_index=False)["time_sec"].mean(),
+        suffixes=("", "_avg"),
+        on=["date", "sender"],
+        how="left",
+    )
+    variance_df["mean_diff"] = abs(
+        variance_df["time_sec"] - variance_df["time_sec_avg"]
+    ).round(2)
+    variance_summary = (
+        variance_df.groupby("sender", as_index=False)["mean_diff"]
+        .mean()
+        .rename(columns={"sender": "Player", "mean_diff": "Variance"})
+        .sort_values(by="Variance", ascending=True)
+        .reset_index(drop=True)
+    )
+    variance_summary.index += 1
+
     # ------------------- Initialize scores -------------------
     total_score = pd.DataFrame(
         {"Player": filtered_df["sender"].unique(), "Total Score": 0}
@@ -424,6 +443,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         total_score,
         final_total_times,
         final_daily_avg_times,
+        variance_summary,
         overall_best_sum,
     )
 
@@ -435,6 +455,7 @@ def main():
         total_score,
         final_total_times,
         final_daily_avg_times,
+        variance_summary,
         overall_best_sum,
     ) = streamlit_app(GAMES=GAMES)
 
@@ -443,7 +464,7 @@ def main():
 
     ranking_type = st.radio(
         "What kind of ranking would you like to see?",
-        ["Total Points", "Total Time", "Average Time", "Times N°1"],
+        ["Total Points", "Total Time", "Average Time", "Times N°1", "Variance"],
         horizontal=True,
     )
     if ranking_type == "Total Points":
@@ -465,6 +486,9 @@ def main():
     elif ranking_type == "Times N°1":
         st.subheader("**Overall Times N°1**")
         st.dataframe(overall_best_sum)
+    elif ranking_type == "Variance":
+        st.subheader("**Overall Variance**")
+        st.dataframe(variance_summary)
 
     st.subheader("**Per-Game Rankings**")
     for title, df in per_game_rankings.items():
