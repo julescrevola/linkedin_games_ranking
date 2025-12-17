@@ -133,7 +133,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
             "ceo_percent": None,
         }
     )
-    df = pd.concat([df, unsaved_data], ignore_index=True)
+    df = pd.concat([df, unsaved_data], ignore_index=True).drop_duplicates()
 
     # ------------------- Filter by day -------------------
     st.subheader("Filter by day")

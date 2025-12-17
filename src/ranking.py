@@ -60,7 +60,7 @@ def compute_per_game_rankings(file_path, day=None):
     Returns a dictionary of DataFrames, one per game, ranked from best (lowest time) to worst.
     Also includes average CEO percentage per player, ignoring NaN values.
     """
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path).drop_duplicates()
     df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
 
     # Filter by day if provided
