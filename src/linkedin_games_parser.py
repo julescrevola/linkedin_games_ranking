@@ -2,7 +2,7 @@
 import re
 import unicodedata
 import pandas as pd
-from datetime import datetime
+import datetime
 
 
 def parse_whatsapp_chat(
@@ -22,7 +22,7 @@ def parse_whatsapp_chat(
 
     # Regex patterns
     line_re = re.compile(
-        r"^\[(\d{2}/\d{2}/\d{2,4}),? (\d{1,2}:\d{2}:\d{2})]\s(.*?):\s([\s\S]*)$",
+        r"^\[(\d{2}/\d{2}/\d{2,4}\s\d{2}:\d{2}:\d{2})]\s(.*?):\s([\s\S]*)$",
         re.MULTILINE | re.DOTALL,
     )
     game_re = re.compile(
@@ -52,18 +52,14 @@ def parse_whatsapp_chat(
             raw = clean_line(raw)
 
             # Check if line starts a new message
-            if re.match(r"^\[(\d{2}/\d{2}/\d{2,4}),? (\d{1,2}:\d{2}:\d{2})]", raw):
+            if re.match(r"^\[(\d{2}/\d{2}/\d{2,4}\s\d{2}:\d{2}:\d{2})]", raw):
                 if current_msg_lines:
                     # Join previous message and parse
                     full_msg = " ".join(current_msg_lines)
                     m = line_re.search(full_msg)
                     if m:
-                        date_str, _, sender, text = m.groups()
-                        dt = (
-                            datetime.strptime(date_str, "%d/%m/%y").date()
-                            if len(date_str) == 8
-                            else datetime.strptime(date_str, "%d/%m/%Y").date()
-                        )
+                        date_str, sender, text = m.groups()
+                        dt = parse_date(date_str)
                         g = game_re.search(text)
                         c = ceo_re.search(text)
                         row = {
@@ -88,12 +84,8 @@ def parse_whatsapp_chat(
             full_msg = " ".join(current_msg_lines)
             m = line_re.search(full_msg)
             if m:
-                date_str, _, sender, text = m.groups()
-                dt = (
-                    datetime.strptime(date_str, "%d/%m/%y").date()
-                    if len(date_str) == 8
-                    else datetime.strptime(date_str, "%d/%m/%Y").date()
-                )
+                date_str, sender, text = m.groups()
+                dt = parse_date(date_str)
                 g = game_re.search(text)
                 c = ceo_re.search(text)
                 row = {
@@ -168,3 +160,16 @@ def clean_line(raw):
     for ch in invisible_chars:
         raw = raw.replace(ch, "")
     return raw
+
+
+def parse_date(date_str):
+    if len(date_str.split("/")[-1].split()[0]) == 2:
+        fmt = "%d/%m/%y %H:%M:%S"
+    else:
+        fmt = "%d/%m/%Y %H:%M:%S"
+
+    dt = datetime.datetime.strptime(date_str, fmt)
+    if dt.time() < datetime.time(9, 0, 0):
+        dt -= datetime.timedelta(days=1)
+
+    return dt.date()
