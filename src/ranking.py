@@ -28,6 +28,7 @@ def run_parser():
             {
                 "date": ["2025-10-17"],
                 "game": ["Queens"],
+                "game_number": [535],
                 "sender": [match],
                 "play_time": ["1:45"],
                 "ceo_percent": None,
@@ -223,14 +224,12 @@ def compute_per_game_rankings(file_path, day=None):
         total_score = total_score.drop(columns=["score"])
 
         # For each date, find the player with the lowest time
-        best_per_day = (
-            game_df.loc[
-                game_df.groupby("date")["time_sec"].idxmin(), ["date", "sender"]
-            ]
-            .groupby("sender")
-            .size()
-            .reset_index(name="num_best")
-        )
+        # Find the minimum time per day
+        min_per_day = game_df.groupby("date")["time_sec"].min()
+        # Keep all rows that match the daily minimum (ties included)
+        best_rows = game_df[game_df["time_sec"].eq(game_df["date"].map(min_per_day))]
+        # Count how many times each sender was best
+        best_per_day = best_rows.groupby("sender").size().reset_index(name="num_best")
 
         # Compute average CEO percentage per player
         ceo_avg = game_df.groupby("sender", as_index=False)["ceo_percent"].mean()

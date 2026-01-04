@@ -128,6 +128,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
         {
             "date": ["2025-10-17"],
             "game": ["Queens"],
+            "game_number": [535],
             "sender": [match],
             "play_time": ["1:45"],
             "ceo_percent": None,
@@ -304,14 +305,12 @@ def streamlit_app(GAMES: list[str] = GAMES):
         total_score = total_score.drop(columns=["score"])
 
         # Compute stats
-        best_per_day = (
-            game_df.loc[
-                game_df.groupby("date")["time_sec"].idxmin(), ["date", "sender"]
-            ]
-            .groupby("sender")
-            .size()
-            .reset_index(name="num_best")
-        )
+        # Find the minimum time per day
+        min_per_day = game_df.groupby("date")["time_sec"].min()
+        # Keep all rows that match the daily minimum (ties included)
+        best_rows = game_df[game_df["time_sec"].eq(game_df["date"].map(min_per_day))]
+        # Count how many times each sender was best
+        best_per_day = best_rows.groupby("sender").size().reset_index(name="num_best")
 
         avg_times = game_df.groupby("sender", as_index=False)["time_sec"].mean()
         min_times = game_df.groupby("sender", as_index=False)["time_sec"].min()
