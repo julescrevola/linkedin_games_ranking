@@ -50,6 +50,13 @@ def load_data_from_supabase():
 ############################### Streamlit App #####################################
 def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
+
+    st.image(
+        "C:/Users/jules/Documents/Perso Python Projects/linkedin_games_ranking/data/input/anto.jpg",
+        width=200,
+        caption="Antonio Roberto Ventura, 2025 Champion 💪",
+    )
+
     per_game_rankings = {}
     total_score = pd.DataFrame(columns=["Player", "Total Score"])
     final_total_times = pd.DataFrame()
@@ -144,9 +151,9 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
     filtered_df = df if day_filter == "All" else df[df["date"] == day_filter]
     if day_filter == "All":
-        default_start_date = "2025-10-14"
+        default_start_date = "2026-01-01"
         day_from = st.selectbox(
-            "Select the day from which to start the overall ranking (Defaults to 2025-10-14)",
+            "Select the day from which to start the overall ranking (Defaults to 2026-01-01)",
             options=[default_start_date] + unique_days,
         )
         filtered_df = filtered_df[filtered_df["date"] >= day_from]
