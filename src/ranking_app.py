@@ -52,8 +52,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
 
     st.image(
-        "C:/Users/jules/Documents/Perso Python Projects/linkedin_games_ranking/data/input/anto.jpg",
-        width=200,
+        "data/input/anto.jpg",
         caption="Antonio Roberto Ventura, 2025 Champion 💪",
     )
 
