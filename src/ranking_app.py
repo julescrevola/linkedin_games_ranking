@@ -43,6 +43,22 @@ def load_data_from_supabase():
         .execute()
     )
     if result.data:
+        # Check if data is older than 24 hours
+        uploaded_at_str = result.data[0].get("uploaded_at")
+        if uploaded_at_str:
+            upload_time = pd.to_datetime(uploaded_at_str)
+            current_time = pd.Timestamp.now(tz=upload_time.tz)
+            time_diff_seconds = (current_time - upload_time).total_seconds()
+
+            # If older than 24 hours (86400 seconds), delete it and return None
+            if time_diff_seconds >= 86400:
+                record_id = result.data[0].get("id")
+                if record_id:
+                    supabase_cred.table("game_data").delete().eq(
+                        "id", record_id
+                    ).execute()
+                return None
+
         return pd.DataFrame(result.data[0]["data"])
     return None
 
@@ -65,8 +81,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.title("LinkedIn Mini Games Leaderboard")
 
-    # Check if existing data exists
-    st.info("Checking for stored leaderboard data...")
+    # Check if there is existing data
     existing = load_data_from_supabase()  # Should return a DataFrame or None
     uploaded_file = None
     df = None
@@ -141,6 +156,8 @@ def streamlit_app(GAMES: list[str] = GAMES):
         }
     )
     df = pd.concat([df, unsaved_data], ignore_index=True).drop_duplicates()
+    # Add weekday column
+    df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
 
     # ------------------- Filter by day -------------------
     st.subheader("Filter by day")
@@ -150,13 +167,22 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
     filtered_df = df if day_filter == "All" else df[df["date"] == day_filter]
     if day_filter == "All":
+        # Start date
         default_start_date = "2026-01-01"
         day_from = st.selectbox(
-            "Select the day from which to start the overall ranking (Defaults to 2026-01-01)",
+            f"Select the day from which to start the overall ranking (Defaults to {default_start_date})",
             options=[default_start_date] + unique_days,
         )
         filtered_df = filtered_df[filtered_df["date"] >= day_from]
-        st.write(f"Showing {len(filtered_df)} entries starting from {day_from}")
+        # End date
+        default_end_date = filtered_df["date"].max()
+        unique_days_after = [day for day in unique_days if day >= day_from]
+        day_to = st.selectbox(
+            f"Select the day until which to show the overall ranking (Defaults to {default_end_date})",
+            options=[default_end_date] + unique_days_after,
+        )
+        filtered_df = filtered_df[filtered_df["date"] <= day_to]
+        st.write(f"Showing {len(filtered_df)} entries from {day_from} to {day_to}")
 
     # ------------------- Preprocess -------------------
     filtered_df["time_sec"] = (
@@ -219,30 +245,39 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
     final_total_times.index += 1
 
-    # ------------------- Compute variance for all games together -------------------
-    variance_df = filtered_df.merge(
-        filtered_df.groupby(["date", "sender"], as_index=False)["time_sec"].mean(),
-        suffixes=("", "_avg"),
-        on=["date", "sender"],
-        how="left",
-    )
-    variance_df["mean_diff"] = abs(
-        variance_df["time_sec"] - variance_df["time_sec_avg"]
-    ).round(2)
-    variance_summary = (
-        variance_df.groupby("sender", as_index=False)["mean_diff"]
-        .mean()
-        .rename(columns={"sender": "Player", "mean_diff": "Variance"})
-        .sort_values(by="Variance", ascending=True)
-        .reset_index(drop=True)
-    )
-    variance_summary.index += 1
-
     # ------------------- Initialize scores -------------------
+    # Total score
     total_score = pd.DataFrame(
         {"Player": filtered_df["sender"].unique(), "Total Score": 0}
     ).merge(games_played, on="Player", how="left")
+    # Times N°1
     overall_best_sum = pd.DataFrame({"Player": filtered_df["sender"].unique()})
+    # Score per weekday
+    weekday_score = pd.DataFrame(
+        {
+            "Player": filtered_df["sender"].unique(),
+            "Monday": 0,
+            "Tuesday": 0,
+            "Wednesday": 0,
+            "Thursday": 0,
+            "Friday": 0,
+            "Saturday": 0,
+            "Sunday": 0,
+        },
+    )
+    # Times N°1 per weekday
+    overall_best_per_weekday = pd.DataFrame(
+        {
+            "Player": filtered_df["sender"].unique(),
+            "Monday": 0,
+            "Tuesday": 0,
+            "Wednesday": 0,
+            "Thursday": 0,
+            "Friday": 0,
+            "Saturday": 0,
+            "Sunday": 0,
+        },
+    )
 
     # ------------------- Per-game Rankings -------------------
     for game in GAMES:
@@ -310,6 +345,25 @@ def streamlit_app(GAMES: list[str] = GAMES):
         ].fillna(0)
         total_score = total_score.drop(columns=["score"])
 
+        # Update weekday score
+        weekday_score_sum = pd.DataFrame(
+            game_df.groupby(["sender", "Weekday"], as_index=False)["score"]
+            .sum()
+            .rename(columns={"sender": "Player", "score": "Score"})
+            .fillna(0)
+        )
+        for day in weekday_score.columns[1:]:  # Skip "Player" column
+            for player in weekday_score["Player"].unique().tolist():
+                try:
+                    weekday_score.loc[weekday_score["Player"] == player, day] += (
+                        weekday_score_sum[
+                            (weekday_score_sum["Player"] == player)
+                            & (weekday_score_sum["Weekday"] == day)
+                        ]["Score"].values[0]
+                    )
+                except IndexError:
+                    weekday_score.loc[weekday_score["Player"] == player, day] += 0
+
         # Compute stats
         # Find the minimum time per day
         min_per_day = game_df.groupby("date")["time_sec"].min()
@@ -317,7 +371,19 @@ def streamlit_app(GAMES: list[str] = GAMES):
         best_rows = game_df[game_df["time_sec"].eq(game_df["date"].map(min_per_day))]
         # Count how many times each sender was best
         best_per_day = best_rows.groupby("sender").size().reset_index(name="num_best")
+        # Count how many times each sender was best per weekday
+        best_per_weekday_counts = (
+            best_rows.groupby(["sender", "Weekday"]).size().reset_index(name="count")
+        )
+        for _, row in best_per_weekday_counts.iterrows():
+            player = row["sender"]
+            day = row["Weekday"]
+            count = row["count"]
+            overall_best_per_weekday.loc[
+                overall_best_per_weekday["Player"] == player, day
+            ] += count
 
+        # Other stats
         avg_times = game_df.groupby("sender", as_index=False)["time_sec"].mean()
         min_times = game_df.groupby("sender", as_index=False)["time_sec"].min()
         ceo_avg = game_df.groupby("sender", as_index=False)["ceo_percent"].mean()
@@ -443,35 +509,63 @@ def streamlit_app(GAMES: list[str] = GAMES):
     ).reset_index(drop=True)
     total_score.index += 1
 
+    # Round score and reset weekday scores index
+    for day in weekday_score.columns[1:]:  # Skip "Player" column
+        weekday_score[day] = weekday_score[day].round(2)
+    weekday_score.index += 1
+
+    # Reset times n°1 per weekday index and convert to int
+    for day in overall_best_per_weekday.columns[1:]:  # Skip "Player" column
+        overall_best_per_weekday[day] = overall_best_per_weekday[day].astype(int)
+    overall_best_per_weekday.index += 1
+
     return (
+        day_filter,
         per_game_rankings,
         total_score,
         final_total_times,
         final_daily_avg_times,
-        variance_summary,
         overall_best_sum,
+        weekday_score,
+        overall_best_per_weekday,
     )
 
 
 ############################### Main #####################################
 def main():
     (
+        day_filter,
         per_game_rankings,
         total_score,
         final_total_times,
         final_daily_avg_times,
-        variance_summary,
         overall_best_sum,
+        weekday_score,
+        overall_best_per_weekday,
     ) = streamlit_app(GAMES=GAMES)
 
     if not per_game_rankings:
         return
 
-    ranking_type = st.radio(
-        "What kind of ranking would you like to see?",
-        ["Total Points", "Total Time", "Average Time", "Times N°1", "Variance"],
-        horizontal=True,
-    )
+    if day_filter != "All":
+        ranking_type = st.radio(
+            "What kind of ranking would you like to see?",
+            ["Total Points", "Total Time", "Average Time", "Times N°1"],
+            horizontal=True,
+        )
+    else:
+        ranking_type = st.radio(
+            "What kind of ranking would you like to see?",
+            [
+                "Total Points",
+                "Total Time",
+                "Average Time",
+                "Times N°1",
+                "Weekday Scores",
+                "Times N°1 per Weekday",
+            ],
+            horizontal=True,
+        )
     if ranking_type == "Total Points":
         st.subheader("**Total Scores**")
         st.dataframe(total_score)
@@ -491,9 +585,12 @@ def main():
     elif ranking_type == "Times N°1":
         st.subheader("**Overall Times N°1**")
         st.dataframe(overall_best_sum)
-    elif ranking_type == "Variance":
-        st.subheader("**Overall Variance**")
-        st.dataframe(variance_summary)
+    elif ranking_type == "Weekday Scores":
+        st.subheader("**Overall Weekday Scores**")
+        st.dataframe(weekday_score)
+    elif ranking_type == "Times N°1 per Weekday":
+        st.subheader("**Times N°1 per Weekday**")
+        st.dataframe(overall_best_per_weekday)
 
     st.subheader("**Per-Game Rankings**")
     for title, df in per_game_rankings.items():

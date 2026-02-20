@@ -35,6 +35,8 @@ def run_parser():
             }
         )
         df = pd.concat([df, unsaved_data], ignore_index=True)
+        # Add weekday column
+        df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
         df.to_csv(PARSER_OUTPUT, index=False)
         return True
     except Exception as e:
@@ -135,30 +137,37 @@ def compute_per_game_rankings(file_path, day=None):
     )
     final_total_times.index += 1
 
-    # Compute variance for all games together
-    variance_df = df.merge(
-        df.groupby(["date", "sender"], as_index=False)["time_sec"].mean(),
-        suffixes=("", "_avg"),
-        on=["date", "sender"],
-        how="left",
-    )
-    variance_df["mean_diff"] = abs(
-        variance_df["time_sec"] - variance_df["time_sec_avg"]
-    ).round(2)
-    variance_summary = (
-        variance_df.groupby("sender", as_index=False)["mean_diff"]
-        .mean()
-        .rename(columns={"sender": "Player", "mean_diff": "Variance"})
-        .sort_values(by="Variance", ascending=True)
-        .reset_index(drop=True)
-    )
-    variance_summary.index += 1
-
     per_game_rankings = {}
     overall_best_sum = pd.DataFrame({"Player": df["sender"].unique()})
     total_score = pd.DataFrame(
         {"Player": df["sender"].unique(), "Total Score": 0}
     ).merge(games_played, on="Player", how="left")
+    # Score per weekday
+    weekday_score = pd.DataFrame(
+        {
+            "Player": df["sender"].unique(),
+            "Monday": 0,
+            "Tuesday": 0,
+            "Wednesday": 0,
+            "Thursday": 0,
+            "Friday": 0,
+            "Saturday": 0,
+            "Sunday": 0,
+        },
+    )
+    # Times N°1 per weekday
+    overall_best_per_weekday = pd.DataFrame(
+        {
+            "Player": df["sender"].unique(),
+            "Monday": 0,
+            "Tuesday": 0,
+            "Wednesday": 0,
+            "Thursday": 0,
+            "Friday": 0,
+            "Saturday": 0,
+            "Sunday": 0,
+        },
+    )
 
     for game in GAMES:
         game_df = df[df["game"].str.lower() == game.lower()]
@@ -223,6 +232,25 @@ def compute_per_game_rankings(file_path, day=None):
         total_score["Total Score"] = total_score["Total Score"] + total_score["score"]
         total_score = total_score.drop(columns=["score"])
 
+        # Update weekday score
+        weekday_score_sum = pd.DataFrame(
+            game_df.groupby(["sender", "Weekday"], as_index=False)["score"]
+            .sum()
+            .rename(columns={"sender": "Player", "score": "Score"})
+            .fillna(0)
+        )
+        for day in weekday_score.columns[1:]:  # Skip "Player" column
+            for player in weekday_score["Player"].unique().tolist():
+                try:
+                    weekday_score.loc[weekday_score["Player"] == player, day] += (
+                        weekday_score_sum[
+                            (weekday_score_sum["Player"] == player)
+                            & (weekday_score_sum["Weekday"] == day)
+                        ]["Score"].values[0]
+                    )
+                except IndexError:
+                    weekday_score.loc[weekday_score["Player"] == player, day] += 0
+
         # For each date, find the player with the lowest time
         # Find the minimum time per day
         min_per_day = game_df.groupby("date")["time_sec"].min()
@@ -230,6 +258,17 @@ def compute_per_game_rankings(file_path, day=None):
         best_rows = game_df[game_df["time_sec"].eq(game_df["date"].map(min_per_day))]
         # Count how many times each sender was best
         best_per_day = best_rows.groupby("sender").size().reset_index(name="num_best")
+        # Count how many times each sender was best per weekday
+        best_per_weekday_counts = (
+            best_rows.groupby(["sender", "Weekday"]).size().reset_index(name="count")
+        )
+        for _, row in best_per_weekday_counts.iterrows():
+            player = row["sender"]
+            day = row["Weekday"]
+            count = row["count"]
+            overall_best_per_weekday.loc[
+                overall_best_per_weekday["Player"] == player, day
+            ] += count
 
         # Compute average CEO percentage per player
         ceo_avg = game_df.groupby("sender", as_index=False)["ceo_percent"].mean()
@@ -363,13 +402,24 @@ def compute_per_game_rankings(file_path, day=None):
     )
     total_score.index += 1
 
+    # Round score and reset weekday scores index
+    for day in weekday_score.columns[1:]:  # Skip "Player" column
+        weekday_score[day] = weekday_score[day].round(2)
+    weekday_score.index += 1
+
+    # Reset times n°1 per weekday index and convert to int
+    for day in overall_best_per_weekday.columns[1:]:  # Skip "Player" column
+        overall_best_per_weekday[day] = overall_best_per_weekday[day].astype(int)
+    overall_best_per_weekday.index += 1
+
     return (
         per_game_rankings,
         total_score,
         final_total_times,
         final_daily_avg_times,
-        variance_summary,
         overall_best_sum,
+        weekday_score,
+        overall_best_per_weekday,
     )
 
 
@@ -382,8 +432,9 @@ def main(day=None):
         total_score,
         final_total_times,
         final_daily_avg_times,
-        variance_summary,
         overall_best_sum,
+        weekday_score,
+        overall_best_per_weekday,
     ) = compute_per_game_rankings(PARSER_OUTPUT, day=day)
     # Total score
     print("\n=== Total Score Rankings ===")
@@ -413,11 +464,18 @@ def main(day=None):
         f"../data/output/{day if day is not None else 'overall'}_overall_times_n1_rankings.csv",
         index=False,
     )
-    # Overall Variance
-    print("\n=== Overall Variance Rankings ===")
-    print(variance_summary)
-    variance_summary.to_csv(
-        f"../data/output/{day if day is not None else 'overall'}_overall_variance_rankings.csv",
+    # Weekday scores
+    print("\n=== Weekday Scores Rankings ===")
+    print(weekday_score)
+    weekday_score.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_weekday_scores_rankings.csv",
+        index=False,
+    )
+    # Weekday times N°1
+    print("\n=== Weekday Times N°1 Rankings ===")
+    print(overall_best_per_weekday)
+    overall_best_per_weekday.to_csv(
+        f"../data/output/{day if day is not None else 'overall'}_weekday_times_n1_rankings.csv",
         index=False,
     )
     # Per game rankings
