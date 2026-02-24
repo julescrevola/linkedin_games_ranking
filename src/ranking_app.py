@@ -43,22 +43,12 @@ def load_data_from_supabase():
         .execute()
     )
     if result.data:
-        # Check if data is older than 24 hours
-        uploaded_at_str = result.data[0].get("uploaded_at")
-        if uploaded_at_str:
-            upload_time = pd.to_datetime(uploaded_at_str)
-            current_time = pd.Timestamp.now(tz=upload_time.tz)
-            time_diff_seconds = (current_time - upload_time).total_seconds()
-
-            # If older than 24 hours (86400 seconds), delete it and return None
-            if time_diff_seconds >= 86400:
-                record_id = result.data[0].get("id")
-                if record_id:
-                    supabase_cred.table("game_data").delete().eq(
-                        "id", record_id
-                    ).execute()
-                return None
-
+        # Delete all rows except the most recent one
+        record_id = result.data[0].get("id")
+        if record_id:
+            st.info("Deleting old data")
+            # keep the latest record and purge any older entries
+            supabase_cred.table("game_data").delete().neq("id", record_id).execute()
         return pd.DataFrame(result.data[0]["data"])
     return None
 
