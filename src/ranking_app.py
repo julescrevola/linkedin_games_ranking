@@ -46,8 +46,6 @@ def load_data_from_supabase():
         # Delete all rows except the most recent one
         record_id = result.data[0].get("id")
         if record_id:
-            st.info("Deleting old data")
-            # keep the latest record and purge any older entries
             supabase_cred.table("game_data").delete().neq("id", record_id).execute()
         return pd.DataFrame(result.data[0]["data"])
     return None
