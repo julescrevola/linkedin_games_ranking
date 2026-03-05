@@ -353,6 +353,12 @@ def streamlit_app(GAMES: list[str] = GAMES):
                     weekday_score.loc[weekday_score["Player"] == player, day] += 0
 
         # Compute stats
+        # Compute number of games played for each player in this game
+        games_played = (
+            game_df.groupby("sender", as_index=False)
+            .size()
+            .rename(columns={"size": "Games Played"})
+        )
         # Find the minimum time per day
         min_per_day = game_df.groupby("date")["time_sec"].min()
         # Keep all rows that match the daily minimum (ties included)
@@ -384,7 +390,8 @@ def streamlit_app(GAMES: list[str] = GAMES):
             .merge(min_times, on="sender", suffixes=("_avg", "_min"))
             .merge(best_per_day, on="sender", how="left")
             .merge(score_sum_copy, on="sender", how="left")
-            .fillna({"num_best": 0})
+            .merge(games_played, on="sender", how="left")
+            .fillna({"num_best": 0, "Games Played": 0, "score": 0})
         )
 
         merged = merged.sort_values(
@@ -417,6 +424,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
                 merged[
                     [
                         "Player",
+                        "Games Played",
                         "Average Time",
                         "Minimum Time",
                         "Average CEO %",
