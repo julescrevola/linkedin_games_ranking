@@ -9,7 +9,7 @@ from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
-GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku"]
+GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 
 # Set up Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -57,7 +57,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.image(
         "src/anto.jpg",
-        caption="Antonio Roberto Ventura, 2025 Champion 💪",
+        caption="Antonio Roberto Ventura, 2026 Q1 Champion 💪",
     )
 
     per_game_rankings = {}
@@ -156,7 +156,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     filtered_df = df if day_filter == "All" else df[df["date"] == day_filter]
     if day_filter == "All":
         # Start date
-        default_start_date = "2026-01-01"
+        default_start_date = "2026-04-01"
         day_from = st.selectbox(
             f"Select the day from which to start the overall ranking (Defaults to {default_start_date})",
             options=[default_start_date] + unique_days,
