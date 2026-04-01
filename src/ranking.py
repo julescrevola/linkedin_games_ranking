@@ -10,7 +10,7 @@ INPUT = "../data/input/_chat.txt"
 PARSER_OUTPUT = "../data/output/games_leaderboard.csv"
 
 # List of known games
-GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku"]
+GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 
 
 def run_parser():

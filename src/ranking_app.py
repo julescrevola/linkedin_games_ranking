@@ -9,7 +9,7 @@ from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
-GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku"]
+GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 
 # Set up Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -57,7 +57,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.image(
         "src/anto.jpg",
-        caption="Antonio Roberto Ventura, 2025 Champion 💪",
+        caption="Antonio Roberto Ventura, 2026 Q1 Champion 💪",
     )
 
     per_game_rankings = {}
