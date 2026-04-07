@@ -44,7 +44,6 @@ def load_data_from_supabase():
             "date": r["play_date"],
             "sender": r["players"]["name"],
             "game": r["games"]["name"],
-            "game_number": None,
             "play_time": r["play_time_display"],
             "ceo_percent": r.get("ceo_percent"),
         })
@@ -84,7 +83,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
             pd.DataFrame(),
         )
 
-    st.success(f"Loaded {len(df)} game results from database.")
+    st.info(f"Data synced automatically — {len(df)} game results loaded.")
     df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
 
     # ------------------- Filter by day -------------------
@@ -211,14 +210,12 @@ def streamlit_app(GAMES: list[str] = GAMES):
     for game in GAMES:
         game_df = filtered_df[filtered_df["game"].str.lower() == game.lower()].copy()
         if game_df.empty:
-            st.info(f"No data for game: {game}")
             continue
 
         # Rank players by time
         score_map = {1: 5, 2: 3, 3: 1}
         game_df["rank"] = game_df.groupby("date")["time_sec"].rank(method="min")
         game_df["score"] = game_df["rank"].map(score_map).fillna(0).astype(float)
-        success_list = []
         for date in game_df["date"].unique():
             date_df = game_df[game_df["date"] == date]
             if date_df["score"].sum() != 9:
@@ -244,21 +241,6 @@ def streamlit_app(GAMES: list[str] = GAMES):
                             (game_df["date"] == date) & (game_df["score"] == key),
                             "score",
                         ] = 1 / val
-            if (
-                (9 <= game_df[game_df["date"] == date]["score"].sum() <= 9.00001)
-                or (
-                    len(date_df) == 2
-                    and game_df[game_df["date"] == date]["score"].sum() == 8
-                )
-                or (
-                    len(date_df) == 1
-                    and game_df[game_df["date"] == date]["score"].sum() == 5
-                )
-                or (len(date_df) == 0)
-            ):
-                success_list.append(True)
-        if len(success_list) == len(game_df["date"].unique()):
-            st.success(f"Scores computed successfully for {game}!")
 
         # Update total score
         score_sum = (
