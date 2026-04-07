@@ -443,6 +443,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
     ).reset_index(drop=True)
+    total_score.insert(0, "Rank", total_score["Total Score"].rank(method="min", ascending=False).astype(int))
     total_score.index += 1
 
     # Round score and reset weekday scores index
