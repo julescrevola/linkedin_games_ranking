@@ -184,13 +184,13 @@ def streamlit_app(GAMES: list[str] = GAMES):
     weekday_score = pd.DataFrame(
         {
             "Player": filtered_df["sender"].unique(),
-            "Monday": 0,
-            "Tuesday": 0,
-            "Wednesday": 0,
-            "Thursday": 0,
-            "Friday": 0,
-            "Saturday": 0,
-            "Sunday": 0,
+            "Monday": 0.0,
+            "Tuesday": 0.0,
+            "Wednesday": 0.0,
+            "Thursday": 0.0,
+            "Friday": 0.0,
+            "Saturday": 0.0,
+            "Sunday": 0.0,
         },
     )
     # Times N°1 per weekday
