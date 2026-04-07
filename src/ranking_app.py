@@ -1,11 +1,6 @@
-import re
 import streamlit as st
 import pandas as pd
 from supabase import create_client
-
-
-# Import parser
-from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
@@ -32,23 +27,28 @@ def time_to_seconds(time_str):
         return None
 
 
-# Load existing data from Supabase
-@st.cache_data
+# Load data from Supabase structured tables
+@st.cache_data(ttl=300)
 def load_data_from_supabase():
     result = (
-        supabase_cred.table("game_data")
-        .select("*")
-        .order("uploaded_at", desc=True)
-        .limit(1)
+        supabase_cred.table("daily_scores")
+        .select("play_date, play_time_display, ceo_percent, players(name), games(name)")
+        .order("play_date")
         .execute()
     )
-    if result.data:
-        # Delete all rows except the most recent one
-        record_id = result.data[0].get("id")
-        if record_id:
-            supabase_cred.table("game_data").delete().neq("id", record_id).execute()
-        return pd.DataFrame(result.data[0]["data"])
-    return None
+    if not result.data:
+        return None
+    rows = []
+    for r in result.data:
+        rows.append({
+            "date": r["play_date"],
+            "sender": r["players"]["name"],
+            "game": r["games"]["name"],
+            "game_number": None,
+            "play_time": r["play_time_display"],
+            "ceo_percent": r.get("ceo_percent"),
+        })
+    return pd.DataFrame(rows)
 
 
 ############################### Streamlit App #####################################
@@ -57,7 +57,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.image(
         "src/anto.jpg",
-        caption="Antonio Roberto Ventura, 2026 Q1 Champion 💪",
+        caption="Antonio Roberto Ventura, 2026 Q1 Champion",
     )
 
     per_game_rankings = {}
@@ -69,82 +69,22 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.title("LinkedIn Mini Games Leaderboard")
 
-    # Check if there is existing data
-    existing = load_data_from_supabase()  # Should return a DataFrame or None
-    uploaded_file = None
-    df = None
+    df = load_data_from_supabase()
 
-    if existing is not None:
-        st.success(f"Found existing data from Supabase! ({len(existing)} entries)")
-        use_existing = st.radio(
-            "What would you like to do?",
-            ["Use Stored Data", "Upload New Data"],
-            horizontal=True,
-        )
-
-        if use_existing == "Use Stored Data":
-            df = existing.copy()
-            st.success(f"Using stored data with {len(df)} entries.")
-        else:
-            uploaded_file = st.file_uploader(
-                "Upload new WhatsApp chat (.txt)", type=["txt"]
-            )
-    else:
-        st.info("No existing data found. Please upload a WhatsApp chat file.")
-        uploaded_file = st.file_uploader(
-            "Upload WhatsApp chat (.txt format)", type=["txt"]
-        )
-
-    # Parse and save new upload
-    if df is None and uploaded_file is not None:
-        try:
-            st.info("Parsing WhatsApp chat...")
-            df = parse_whatsapp_chat(uploaded_file)
-            st.success(f"Parsed {len(df)} game entries!")
-            df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
-
-            # Save parsed data to Supabase
-            st.info("Saving parsed data to Supabase...")
-            supabase_cred.table("game_data").insert(
-                {"data": df.to_dict(orient="records")}
-            ).execute()
-            st.success("Data saved to Supabase successfully!")
-            load_data_from_supabase.clear()
-
-        except Exception as e:
-            import traceback
-
-            st.error(f"Error parsing chat: {e}")
-            st.code(traceback.format_exc())
-            return per_game_rankings, total_score
-
-    if df is None:
-        st.warning("No data available. Please upload a WhatsApp chat file.")
+    if df is None or df.empty:
+        st.warning("No data available yet. Scores are synced automatically every day at 20:00 CET.")
         return (
+            day_filter,
             per_game_rankings,
             total_score,
             final_total_times,
             final_daily_avg_times,
             overall_best_sum,
+            pd.DataFrame(),
+            pd.DataFrame(),
         )
 
-    # Hard code unsaved results for Samuele on 2025-10-17 for Queens
-    # Regex pattern — case-insensitive search for 'samu'
-    pattern = re.compile(r"samu", re.IGNORECASE)
-    # Find name that matches
-    match = [name for name in df["sender"].unique() if pattern.search(name)][0].title()
-    unsaved_data = pd.DataFrame(
-        {
-            "date": ["2025-10-17"],
-            "game": ["Queens"],
-            "game_number": [535],
-            "sender": [match],
-            "play_time": ["1:45"],
-            "ceo_percent": None,
-        }
-    )
-    df = pd.concat([df, unsaved_data], ignore_index=True).drop_duplicates()
-    # Add weekday column
+    st.success(f"Loaded {len(df)} game results from database.")
     df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
 
     # ------------------- Filter by day -------------------
