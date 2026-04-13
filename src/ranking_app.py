@@ -450,8 +450,211 @@ def streamlit_app(GAMES: list[str] = GAMES):
     )
 
 
+############################### 1v1 Head-to-Head #####################################
+def head_to_head_page():
+    """1v1 head-to-head comparison between two players."""
+    st.title("1v1 Head-to-Head")
+
+    df = load_data_from_supabase()
+    if df is None or df.empty:
+        st.warning("No data available yet.")
+        return
+
+    players = sorted(df["sender"].unique())
+    if len(players) < 2:
+        st.warning("Need at least 2 players for a head-to-head comparison.")
+        return
+
+    # Player selectors
+    col1, col2 = st.columns(2)
+    with col1:
+        player1 = st.selectbox("Player 1", players, index=0)
+    with col2:
+        default_p2 = 1 if len(players) > 1 else 0
+        player2 = st.selectbox("Player 2", players, index=default_p2)
+
+    if player1 == player2:
+        st.warning("Select two different players.")
+        return
+
+    # Date range slider
+    dates = pd.to_datetime(df["date"])
+    min_date, max_date = dates.min().date(), dates.max().date()
+    date_from, date_to = st.slider(
+        "Date range",
+        min_value=min_date,
+        max_value=max_date,
+        value=(min_date, max_date),
+        format="YYYY-MM-DD",
+    )
+    df = df[(df["date"] >= str(date_from)) & (df["date"] <= str(date_to))]
+
+    count_missing = st.toggle(
+        "Count missing scores as losses",
+        value=False,
+        help="When enabled, if only one player shared a score for a game on a given day, "
+        "the other player is counted as a loss. When disabled, only games where both "
+        "players shared their times are compared.",
+    )
+
+    # Preprocess
+    df["time_sec"] = df["play_time"].astype(str).apply(time_to_seconds)
+    df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
+
+    p1_df = df[df["sender"] == player1][["date", "game", "time_sec", "Weekday"]]
+    p2_df = df[df["sender"] == player2][["date", "game", "time_sec", "Weekday"]]
+
+    merged = p1_df.merge(
+        p2_df, on=["date", "game", "Weekday"], how="outer", suffixes=("_p1", "_p2")
+    )
+
+    results = []
+    for _, row in merged.iterrows():
+        t1, t2 = row["time_sec_p1"], row["time_sec_p2"]
+        has_p1, has_p2 = pd.notna(t1), pd.notna(t2)
+
+        if has_p1 and has_p2:
+            winner = player1 if t1 < t2 else (player2 if t2 < t1 else "draw")
+        elif has_p1 and not has_p2:
+            if not count_missing:
+                continue
+            winner = player1
+        elif has_p2 and not has_p1:
+            if not count_missing:
+                continue
+            winner = player2
+        else:
+            continue
+
+        results.append({
+            "date": row["date"],
+            "game": row["game"],
+            "weekday": row["Weekday"],
+            "winner": winner,
+        })
+
+    if not results:
+        st.info("No head-to-head matchups found between these players.")
+        return
+
+    results_df = pd.DataFrame(results)
+    p1_wins = int((results_df["winner"] == player1).sum())
+    p2_wins = int((results_df["winner"] == player2).sum())
+    draws = int((results_df["winner"] == "draw").sum())
+    total = p1_wins + p2_wins + draws
+
+    P1_COLOR = "#4A90D9"
+    P2_COLOR = "#E74C3C"
+
+    def _bar_html(w1, w2, label, height=28, font_size=14):
+        """Render a split bar with player colors. Returns HTML string."""
+        t = w1 + w2
+        if t == 0:
+            return ""
+        p1_pct = w1 / t * 100
+        p2_pct = w2 / t * 100
+        # Minimum visible width for the side that has wins
+        min_w = "2px" if w1 > 0 else "0"
+        min_w2 = "2px" if w2 > 0 else "0"
+        return f"""
+        <div style="margin-bottom:4px;">
+          <div style="font-size:15px; color:#ccc; margin-bottom:3px; font-weight:500;">{label}</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="min-width:28px; text-align:right; font-size:{font_size}px; font-weight:600; color:{P1_COLOR};">{w1}</span>
+            <div style="flex:1; display:flex; height:{height}px; border-radius:4px; overflow:hidden;">
+              <div style="width:{p1_pct}%; min-width:{min_w}; background:{P1_COLOR};"></div>
+              <div style="width:{p2_pct}%; min-width:{min_w2}; background:{P2_COLOR};"></div>
+            </div>
+            <span style="min-width:28px; text-align:left; font-size:{font_size}px; font-weight:600; color:{P2_COLOR};">{w2}</span>
+          </div>
+        </div>
+        """
+
+    # --- Overall record ---
+    st.subheader("Overall Record")
+    p1_pct = int(p1_wins / (p1_wins + p2_wins) * 100) if p1_wins + p2_wins > 0 else 0
+    p2_pct = int(p2_wins / (p1_wins + p2_wins) * 100) if p1_wins + p2_wins > 0 else 0
+    st.markdown(f"""
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="text-align:center;">
+        <div style="font-size:14px; color:#ccc;">{player1}</div>
+        <div style="font-size:28px; font-weight:700; color:{P1_COLOR};">{p1_wins} <span style="font-size:20px;">({p1_pct}%)</span></div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:14px; color:#888;">Draws</div>
+        <div style="font-size:22px; font-weight:600; color:#888;">{draws}</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:14px; color:#ccc;">{player2}</div>
+        <div style="font-size:28px; font-weight:700; color:{P2_COLOR};">{p2_wins} <span style="font-size:20px;">({p2_pct}%)</span></div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(_bar_html(p1_wins, p2_wins, "", height=32, font_size=16), unsafe_allow_html=True)
+    st.caption(f"{total} matchups compared")
+
+    # --- Win % over time (normalized stacked area) ---
+    st.subheader("Win % Over Time")
+    daily = results_df[results_df["winner"] != "draw"].copy()
+    if not daily.empty:
+        import altair as alt
+        daily["is_p1"] = (daily["winner"] == player1).astype(int)
+        daily["is_p2"] = (daily["winner"] == player2).astype(int)
+        by_date = daily.groupby("date")[["is_p1", "is_p2"]].sum().sort_index()
+        cum = by_date.cumsum()
+        melted = cum.reset_index().melt("date", var_name="player", value_name="wins")
+        melted["date"] = pd.to_datetime(melted["date"])
+        melted["player"] = melted["player"].map({"is_p1": player1, "is_p2": player2})
+        # Order so player1 is on top, player2 on bottom
+        area = alt.Chart(melted).mark_area().encode(
+            x=alt.X("date:T", title=None),
+            y=alt.Y("wins:Q", stack="normalize", title=None, axis=alt.Axis(format="%")),
+            color=alt.Color("player:N", scale=alt.Scale(
+                domain=[player1, player2],
+                range=[P1_COLOR, P2_COLOR],
+            ), legend=None),
+            order=alt.Order("player:N", sort="ascending"),
+        ).properties(height=300)
+        st.altair_chart(area, use_container_width=True)
+
+    # --- Wins by day of week ---
+    st.subheader("Wins by Day of Week")
+    days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekday_html = ""
+    for day in days_order:
+        day_df = results_df[results_df["weekday"] == day]
+        if day_df.empty:
+            continue
+        w1 = int((day_df["winner"] == player1).sum())
+        w2 = int((day_df["winner"] == player2).sum())
+        if w1 + w2 == 0:
+            continue
+        weekday_html += _bar_html(w1, w2, day, height=22, font_size=13)
+    if weekday_html:
+        st.markdown(weekday_html, unsafe_allow_html=True)
+
+    # --- Wins by game ---
+    st.subheader("Wins by Game")
+    game_emoji = {"zip": "⚡", "tango": "💃", "queens": "👑", "mini sudoku": "🔢", "patches": "🧩"}
+    game_html = ""
+    for game in GAMES:
+        game_df = results_df[results_df["game"].str.lower() == game.lower()]
+        if game_df.empty:
+            continue
+        w1 = int((game_df["winner"] == player1).sum())
+        w2 = int((game_df["winner"] == player2).sum())
+        if w1 + w2 == 0:
+            continue
+        emoji = game_emoji.get(game.lower(), "🎮")
+        game_html += _bar_html(w1, w2, f"{emoji} {game}", height=22, font_size=13)
+    if game_html:
+        st.markdown(game_html, unsafe_allow_html=True)
+
+
 ############################### Main #####################################
-def main():
+def leaderboard_page():
+    """Original leaderboard page."""
     (
         day_filter,
         per_game_rankings,
@@ -515,6 +718,14 @@ def main():
     for title, df in per_game_rankings.items():
         st.markdown(f"**{title} Rankings**")
         st.dataframe(df)
+
+
+def main():
+    page = st.sidebar.radio("Navigation", ["Leaderboard", "1v1 Head-to-Head"])
+    if page == "Leaderboard":
+        leaderboard_page()
+    else:
+        head_to_head_page()
 
 
 if __name__ == "__main__":
