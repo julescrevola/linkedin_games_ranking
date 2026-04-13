@@ -1,3 +1,6 @@
+# Virtualenv
+.venv/
+
 # Data
 data/
 *.txt
