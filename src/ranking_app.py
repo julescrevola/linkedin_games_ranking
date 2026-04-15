@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from supabase import create_client
+from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
@@ -9,8 +11,11 @@ GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 # Set up Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+SUPABASE_URL_JULES = st.secrets["SUPABASE_URL_JULES"]
+SUPABASE_KEY_JULES = st.secrets["SUPABASE_KEY_JULES"]
 
-supabase_cred = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_cred_carlo = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_cred_jules = create_client(SUPABASE_URL_JULES, SUPABASE_KEY_JULES)
 
 
 ################################### Tools #########################################
@@ -31,7 +36,7 @@ def time_to_seconds(time_str):
 @st.cache_data(ttl=300)
 def load_data_from_supabase():
     result = (
-        supabase_cred.table("daily_scores")
+        supabase_cred_carlo.table("daily_scores")
         .select("play_date, play_time_display, ceo_percent, players(name), games(name)")
         .order("play_date")
         .execute()
@@ -40,13 +45,15 @@ def load_data_from_supabase():
         return None
     rows = []
     for r in result.data:
-        rows.append({
-            "date": r["play_date"],
-            "sender": r["players"]["name"],
-            "game": r["games"]["name"],
-            "play_time": r["play_time_display"],
-            "ceo_percent": r.get("ceo_percent"),
-        })
+        rows.append(
+            {
+                "date": r["play_date"],
+                "sender": r["players"]["name"],
+                "game": r["games"]["name"],
+                "play_time": r["play_time_display"],
+                "ceo_percent": r.get("ceo_percent"),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -71,7 +78,9 @@ def streamlit_app(GAMES: list[str] = GAMES):
     df = load_data_from_supabase()
 
     if df is None or df.empty:
-        st.warning("No data available yet. Scores are synced automatically every day at 20:00 CET.")
+        st.warning(
+            "No data available yet. Scores are synced automatically every day at 20:00 CET."
+        )
         return (
             day_filter,
             per_game_rankings,
@@ -82,8 +91,35 @@ def streamlit_app(GAMES: list[str] = GAMES):
             pd.DataFrame(),
             pd.DataFrame(),
         )
+    if df["date"].iloc[-1] < datetime.now().strftime("%Y-%m-%d"):
+        use_existing = st.radio(
+            "What would you like to do?",
+            ["Use Stored Data", "Upload New Data"],
+            horizontal=True,
+        )
+        if use_existing == "Use Stored Data":
+            df = pd.DataFrame(
+                (
+                    supabase_cred_jules.table("game_data")
+                    .select("*")
+                    .order("uploaded_at", desc=True)
+                    .limit(1)
+                    .execute()
+                ).data[0]["data"]
+            )
+        else:
+            uploaded_file = st.file_uploader(
+                "Upload new WhatsApp chat (.txt)", type=["txt"]
+            )
+            df = parse_whatsapp_chat(uploaded_file)
+            df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
+            supabase_cred_jules.table("game_data").insert(
+                {"data": df.to_dict(orient="records")}
+            ).execute()
+            st.success(f"Parsed {len(df)} game entries!")
+    else:
+        st.info(f"Data synced automatically — {len(df)} game results loaded.")
 
-    st.info(f"Data synced automatically — {len(df)} game results loaded.")
     df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
 
     # ------------------- Filter by day -------------------
@@ -425,7 +461,11 @@ def streamlit_app(GAMES: list[str] = GAMES):
     total_score = total_score.sort_values(
         by="Total Score", ascending=False
     ).reset_index(drop=True)
-    total_score.insert(0, "Rank", total_score["Total Score"].rank(method="min", ascending=False).astype(int))
+    total_score.insert(
+        0,
+        "Rank",
+        total_score["Total Score"].rank(method="min", ascending=False).astype(int),
+    )
     total_score.index += 1
 
     # Round score and reset weekday scores index
@@ -526,12 +566,14 @@ def head_to_head_page():
         else:
             continue
 
-        results.append({
-            "date": row["date"],
-            "game": row["game"],
-            "weekday": row["Weekday"],
-            "winner": winner,
-        })
+        results.append(
+            {
+                "date": row["date"],
+                "game": row["game"],
+                "weekday": row["Weekday"],
+                "winner": winner,
+            }
+        )
 
     if not results:
         st.info("No head-to-head matchups found between these players.")
@@ -574,7 +616,8 @@ def head_to_head_page():
     st.subheader("Overall Record")
     p1_pct = int(p1_wins / (p1_wins + p2_wins) * 100) if p1_wins + p2_wins > 0 else 0
     p2_pct = int(p2_wins / (p1_wins + p2_wins) * 100) if p1_wins + p2_wins > 0 else 0
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <div style="text-align:center;">
         <div style="font-size:14px; color:#ccc;">{player1}</div>
@@ -589,9 +632,13 @@ def head_to_head_page():
         <div style="font-size:28px; font-weight:700; color:{P2_COLOR};">{p2_wins} <span style="font-size:20px;">({p2_pct}%)</span></div>
       </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown(_bar_html(p1_wins, p2_wins, "", height=32, font_size=16), unsafe_allow_html=True)
+    st.markdown(
+        _bar_html(p1_wins, p2_wins, "", height=32, font_size=16), unsafe_allow_html=True
+    )
     st.caption(f"{total} matchups compared")
 
     # --- Win % over time (normalized stacked area) ---
@@ -599,6 +646,7 @@ def head_to_head_page():
     daily = results_df[results_df["winner"] != "draw"].copy()
     if not daily.empty:
         import altair as alt
+
         daily["is_p1"] = (daily["winner"] == player1).astype(int)
         daily["is_p2"] = (daily["winner"] == player2).astype(int)
         by_date = daily.groupby("date")[["is_p1", "is_p2"]].sum().sort_index()
@@ -607,20 +655,39 @@ def head_to_head_page():
         melted["date"] = pd.to_datetime(melted["date"])
         melted["player"] = melted["player"].map({"is_p1": player1, "is_p2": player2})
         # Order so player1 is on top, player2 on bottom
-        area = alt.Chart(melted).mark_area().encode(
-            x=alt.X("date:T", title=None),
-            y=alt.Y("wins:Q", stack="normalize", title=None, axis=alt.Axis(format="%")),
-            color=alt.Color("player:N", scale=alt.Scale(
-                domain=[player1, player2],
-                range=[P1_COLOR, P2_COLOR],
-            ), legend=None),
-            order=alt.Order("player:N", sort="ascending"),
-        ).properties(height=300)
+        area = (
+            alt.Chart(melted)
+            .mark_area()
+            .encode(
+                x=alt.X("date:T", title=None),
+                y=alt.Y(
+                    "wins:Q", stack="normalize", title=None, axis=alt.Axis(format="%")
+                ),
+                color=alt.Color(
+                    "player:N",
+                    scale=alt.Scale(
+                        domain=[player1, player2],
+                        range=[P1_COLOR, P2_COLOR],
+                    ),
+                    legend=None,
+                ),
+                order=alt.Order("player:N", sort="ascending"),
+            )
+            .properties(height=300)
+        )
         st.altair_chart(area, use_container_width=True)
 
     # --- Wins by day of week ---
     st.subheader("Wins by Day of Week")
-    days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    days_order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
     weekday_html = ""
     for day in days_order:
         day_df = results_df[results_df["weekday"] == day]
@@ -636,7 +703,13 @@ def head_to_head_page():
 
     # --- Wins by game ---
     st.subheader("Wins by Game")
-    game_emoji = {"zip": "⚡", "tango": "💃", "queens": "👑", "mini sudoku": "🔢", "patches": "🧩"}
+    game_emoji = {
+        "zip": "⚡",
+        "tango": "💃",
+        "queens": "👑",
+        "mini sudoku": "🔢",
+        "patches": "🧩",
+    }
     game_html = ""
     for game in GAMES:
         game_df = results_df[results_df["game"].str.lower() == game.lower()]
