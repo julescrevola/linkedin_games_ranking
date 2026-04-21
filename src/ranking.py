@@ -16,7 +16,10 @@ GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 def run_parser():
     """Run the linkedin_games_parser.py script to update CSV."""
     try:
-        df = parse_whatsapp_chat(INPUT)  # returns DataFrame with correct columns
+        df = parse_whatsapp_chat(
+            INPUT
+        ).drop_duplicates()  # returns DataFrame with correct columns
+        df = df[df["game"].isin(GAMES)]
         # Hard code unsaved results for Samuele on 2025-10-17 for Queens
         # Regex pattern — case-insensitive search for 'samu'
         pattern = re.compile(r"samu", re.IGNORECASE)

@@ -106,12 +106,13 @@ def streamlit_app(GAMES: list[str] = GAMES):
                     .limit(1)
                     .execute()
                 ).data[0]["data"]
-            )
+            ).drop_duplicates()
         else:
             uploaded_file = st.file_uploader(
                 "Upload new WhatsApp chat (.txt)", type=["txt"]
             )
-            df = parse_whatsapp_chat(uploaded_file)
+            df = parse_whatsapp_chat(uploaded_file).drop_duplicates()
+            df = df[df["game"].isin(GAMES)]
             df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
             supabase_cred_jules.table("game_data").insert(
                 {"data": df.to_dict(orient="records")}
