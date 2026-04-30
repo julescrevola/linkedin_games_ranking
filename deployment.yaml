@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linkedin-games-ranking
+  labels:
+    app: linkedin-games-ranking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: linkedin-games-ranking
+  template:
+    metadata:
+      labels:
+        app: linkedin-games-ranking
+    spec:
+      containers:
+      - name: linkedin-games-ranking
+        image: julescrevola/linkedin-games:latest
+        ports:
+        - containerPort: 8501
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: linkedin-games-ranking
+  labels:
+    app: linkedin-games-ranking
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8501
+  selector:
+    app: linkedin-games-ranking

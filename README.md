@@ -61,7 +61,7 @@ pre-commit install
 ### In local:
 
 To run the scripts, you have 2 options:
-- If you wish, you can first run the parser script from `src/` with (make sure that the input and output data paths are the right ones)
+- If you wish, you can first run the parser script with (make sure that the input and output data paths are the right ones)
 ```bash
 python linkedin_games_parser.py
 ```
@@ -82,7 +82,7 @@ First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE
 
 Run in your terminal:
 ```bash
-streamlit run src/ranking_app.py
+streamlit run ranking_app.py
 ```
 
 **You are ready to create your own ranking!**
