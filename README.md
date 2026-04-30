@@ -5,7 +5,7 @@
 # LinkedIn Games Ranking
 
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
-Find the published Streamlit app [here](https://linkedin-games-ranking.streamlit.app/).
+Find the Streamlit app [here](http://20.103.37.32:80).
 
 Total score are computed by awarding the following points, per game per day:
 - 5 points for the best player
@@ -29,7 +29,8 @@ git clone https://github.com/julescrevola/linkedin_games_ranking.git
 
 ## Set up coding environment
 
-To use this repo, first run:
+To use this repo, first [install uv](https://docs.astral.sh/uv/getting-started/installation/).
+Then, run:
 ```bash
 source cli-aliases.sh
 ```
@@ -39,9 +40,15 @@ You can then install the environment with:
 ```bash
 envc
 ```
-And you can update it with:
+
+And when coming back to the code later, you can reactivate the environment with:
 ```bash
-envu
+enva
+```
+
+To deactivate the environment, run:
+```bash
+deactivate
 ```
 
 To install pre-commit hooks, run:
@@ -54,7 +61,7 @@ pre-commit install
 ### In local:
 
 To run the scripts, you have 2 options:
-- If you wish, you can first run the parser script from `src/` with (make sure that the input and output data paths are the right ones)
+- If you wish, you can first run the parser script with (make sure that the input and output data paths are the right ones)
 ```bash
 python linkedin_games_parser.py
 ```
@@ -71,16 +78,26 @@ python ranking.py --day <YYYY-MM-DD>
 ```
 ### As a Streamlit app
 
-First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account.
-For instance:
-```toml
-SUPABASE_URL = "https://<something>.supabase.co"
-SUPABASE_KEY = "12345678"
-```
+First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account. To do so, you can copy `.streamlit.secrets.example.toml` and rename it, then change the values inside.
 
 Run in your terminal:
 ```bash
-streamlit run src/ranking_app.py
+streamlit run ranking_app.py
 ```
+
+### Deploy to your own Kubernetes cluster
+
+**This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with other method and change the code accordingly for your usage.**
+
+First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
+Provision the AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
+
+Remember to load aliases with:
+```bash
+source cli-aliases.sh
+```
+Then run `deploy`. It will create a new deployment names *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
+
+You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
 **You are ready to create your own ranking!**

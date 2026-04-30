@@ -1,21 +1,28 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 from supabase import create_client
 from linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants
 GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
+PLAYERS = [
+    "Antonio Ventura",
+    "Carlo Patti",
+    "Jules Crevola",
+    "Samuele Bodon",
+    "Alessio Teruzzi",
+    "Alessandro Viletto",
+    "Edoardo Occhilupo",
+    "Andrea Pisetta",
+    "Giorgio Cappuccinelli",
+]
 
 # Set up Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-SUPABASE_URL_JULES = st.secrets["SUPABASE_URL_JULES"]
-SUPABASE_KEY_JULES = st.secrets["SUPABASE_KEY_JULES"]
 
-supabase_cred_carlo = create_client(SUPABASE_URL, SUPABASE_KEY)
-supabase_cred_jules = create_client(SUPABASE_URL_JULES, SUPABASE_KEY_JULES)
+supabase_cred_jules = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 ################################### Tools #########################################
@@ -32,29 +39,39 @@ def time_to_seconds(time_str):
         return None
 
 
-# Load data from Supabase structured tables
-@st.cache_data(ttl=300)
+# Load data from Supabase structured tables or from uploaded WhatsApp chat if data is outdated
 def load_data_from_supabase():
-    result = (
-        supabase_cred_carlo.table("daily_scores")
-        .select("play_date, play_time_display, ceo_percent, players(name), games(name)")
-        .order("play_date")
-        .execute()
+    use_existing = st.radio(
+        "What would you like to do?",
+        ["Use Stored Data", "Upload New Data"],
+        horizontal=True,
     )
-    if not result.data:
-        return None
-    rows = []
-    for r in result.data:
-        rows.append(
-            {
-                "date": r["play_date"],
-                "sender": r["players"]["name"],
-                "game": r["games"]["name"],
-                "play_time": r["play_time_display"],
-                "ceo_percent": r.get("ceo_percent"),
-            }
+    if use_existing == "Use Stored Data":
+        df = pd.DataFrame(
+            (
+                supabase_cred_jules.table("game_data")
+                .select("*")
+                .order("uploaded_at", desc=True)
+                .execute()
+            ).data
+        ).drop_duplicates()
+        df = df[df["game"].isin(GAMES)]
+        df = df[df["sender"].isin(PLAYERS)]
+    else:
+        uploaded_file = st.file_uploader(
+            "Upload new WhatsApp chat (.txt)", type=["txt"]
         )
-    return pd.DataFrame(rows)
+        while df is None:
+            st.write("Waiting for data to be loaded...")
+            return None
+        df = parse_whatsapp_chat(uploaded_file).drop_duplicates()
+        df = df[df["game"].isin(GAMES)]
+        df = df[df["sender"].isin(PLAYERS)]
+        supabase_cred_jules.table("game_data").upsert(
+            df.to_dict(orient="records")
+        ).execute()
+        st.success(f"Parsed {len(df)} game entries!")
+    return df
 
 
 ############################### Streamlit App #####################################
@@ -62,7 +79,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
 
     st.image(
-        "src/anto.jpg",
+        "assets/anto.jpg",
         caption="Antonio Roberto Ventura, 2026 Q1 Champion",
     )
 
@@ -78,9 +95,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     df = load_data_from_supabase()
 
     if df is None or df.empty:
-        st.warning(
-            "No data available yet. Scores are synced automatically every day at 20:00 CET."
-        )
+        st.warning("No data available. Please upload a new WhatsApp chat .txt file.")
         return (
             day_filter,
             per_game_rankings,
@@ -91,35 +106,6 @@ def streamlit_app(GAMES: list[str] = GAMES):
             pd.DataFrame(),
             pd.DataFrame(),
         )
-    if df["date"].iloc[-1] < datetime.now().strftime("%Y-%m-%d"):
-        use_existing = st.radio(
-            "What would you like to do?",
-            ["Use Stored Data", "Upload New Data"],
-            horizontal=True,
-        )
-        if use_existing == "Use Stored Data":
-            df = pd.DataFrame(
-                (
-                    supabase_cred_jules.table("game_data")
-                    .select("*")
-                    .order("uploaded_at", desc=True)
-                    .limit(1)
-                    .execute()
-                ).data[0]["data"]
-            ).drop_duplicates()
-        else:
-            uploaded_file = st.file_uploader(
-                "Upload new WhatsApp chat (.txt)", type=["txt"]
-            )
-            df = parse_whatsapp_chat(uploaded_file).drop_duplicates()
-            df = df[df["game"].isin(GAMES)]
-            df = df[df["sender"] != "X - Games (Nazionale di Zip)"]
-            supabase_cred_jules.table("game_data").insert(
-                {"data": df.to_dict(orient="records")}
-            ).execute()
-            st.success(f"Parsed {len(df)} game entries!")
-    else:
-        st.info(f"Data synced automatically — {len(df)} game results loaded.")
 
     df["Weekday"] = pd.to_datetime(df["date"]).dt.day_name()
 
@@ -150,7 +136,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     # ------------------- Preprocess -------------------
     filtered_df["time_sec"] = (
-        filtered_df["play_time"].astype(str).apply(time_to_seconds)
+        filtered_df["play_time"].astype(str).apply(time_to_seconds).astype(int)
     )
     filtered_df["ceo_percent"] = pd.to_numeric(
         filtered_df["ceo_percent"], errors="coerce"

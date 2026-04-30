@@ -69,7 +69,7 @@ def parse_whatsapp_chat(
                             "game": g.group("game").strip() if g else None,
                             "game_number": g.group("number") if g else None,
                             "play_time": g.group("time") if g else None,
-                            "ceo_percent": c.group("percent") if c else None,
+                            "ceo_percent": c.group("percent") if c else "",
                         }
                         rows.append(row)
                     current_msg_lines = []
@@ -95,7 +95,7 @@ def parse_whatsapp_chat(
                     "game": g.group("game").strip() if g else None,
                     "game_number": g.group("number") if g else None,
                     "play_time": g.group("time") if g else None,
-                    "ceo_percent": c.group("percent") if c else None,
+                    "ceo_percent": c.group("percent") if c else "",
                 }
                 rows.append(row)
 
