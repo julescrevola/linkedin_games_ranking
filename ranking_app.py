@@ -61,9 +61,6 @@ def load_data_from_supabase():
         uploaded_file = st.file_uploader(
             "Upload new WhatsApp chat (.txt)", type=["txt"]
         )
-        while df is None:
-            st.write("Waiting for data to be loaded...")
-            return None
         df = parse_whatsapp_chat(uploaded_file).drop_duplicates()
         df = df[df["game"].isin(GAMES)]
         df = df[df["sender"].isin(PLAYERS)]
