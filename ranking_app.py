@@ -79,7 +79,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
 
     st.image(
-        "assets/anto.jpg",
+        "anto.jpg",
         caption="Antonio Roberto Ventura, 2026 Q1 Champion",
     )
 
