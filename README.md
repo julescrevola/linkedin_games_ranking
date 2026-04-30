@@ -5,7 +5,7 @@
 # LinkedIn Games Ranking
 
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
-Find the published Streamlit app [here](https://linkedin-games-ranking.streamlit.app/).
+Find the Streamlit app [here](http://20.103.37.32:80).
 
 Total score are computed by awarding the following points, per game per day:
 - 5 points for the best player
@@ -84,5 +84,20 @@ Run in your terminal:
 ```bash
 streamlit run ranking_app.py
 ```
+
+### Deploy to your own Kubernetes cluster
+
+**This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with other method and change the code accordingly for your usage.**
+
+First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
+Provision the AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
+
+Remember to load aliases with:
+```bash
+source cli-aliases.sh
+```
+Then run `deploy`. It will create a new deployment names *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
+
+You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
 **You are ready to create your own ranking!**
