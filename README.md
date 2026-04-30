@@ -29,7 +29,8 @@ git clone https://github.com/julescrevola/linkedin_games_ranking.git
 
 ## Set up coding environment
 
-To use this repo, first run:
+To use this repo, first [install uv](https://docs.astral.sh/uv/getting-started/installation/).
+Then, run:
 ```bash
 source cli-aliases.sh
 ```
@@ -39,9 +40,15 @@ You can then install the environment with:
 ```bash
 envc
 ```
-And you can update it with:
+
+And when coming back to the code later, you can reactivate the environment with:
 ```bash
-envu
+enva
+```
+
+To deactivate the environment, run:
+```bash
+deactivate
 ```
 
 To install pre-commit hooks, run:
@@ -71,12 +78,7 @@ python ranking.py --day <YYYY-MM-DD>
 ```
 ### As a Streamlit app
 
-First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account.
-For instance:
-```toml
-SUPABASE_URL = "https://<something>.supabase.co"
-SUPABASE_KEY = "12345678"
-```
+First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account. To do so, you can copy `.streamlit.secrets.example.toml` and rename it, then change the values inside.
 
 Run in your terminal:
 ```bash

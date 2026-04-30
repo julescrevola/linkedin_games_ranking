@@ -1,0 +1,13 @@
+[project]
+name = "linkedin_games_ranking"
+version = "0.1.0"
+description = "App to create custom rankings for LinkedIn games."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=3.0.2",
+    "pre-commit>=4.6.0",
+    "streamlit>=1.57.0",
+    "supabase>=2.29.0",
+    "timedelta>=2020.12.3",
+]

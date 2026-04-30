@@ -2,8 +2,7 @@
 .venv/
 
 # Data
-data/
-*.txt
+*chat*.txt
 *.csv
 
 # pycache
