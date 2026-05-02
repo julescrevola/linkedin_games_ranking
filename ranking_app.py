@@ -54,21 +54,54 @@ def load_data_from_supabase():
                 .order("uploaded_at", desc=True)
                 .execute()
             ).data
-        ).drop_duplicates()
-        df = df[df["game"].isin(GAMES)]
-        df = df[df["sender"].isin(PLAYERS)]
+        ).drop_duplicates(subset=["date", "sender", "game"])
     else:
         uploaded_file = st.file_uploader(
             "Upload new WhatsApp chat (.txt)", type=["txt"]
         )
-        df = parse_whatsapp_chat(uploaded_file).drop_duplicates()
-        df = df[df["game"].isin(GAMES)]
-        df = df[df["sender"].isin(PLAYERS)]
-        supabase_cred_jules.table("game_data").upsert(
-            df.to_dict(orient="records")
-        ).execute()
-        st.success(f"Parsed {len(df)} game entries!")
-    return df
+        if uploaded_file is not None:
+            df = parse_whatsapp_chat(uploaded_file).drop_duplicates(
+                subset=["date", "sender", "game"]
+            )
+            df = df[df["game"].isin(GAMES)]
+            df = df[df["sender"].isin(PLAYERS)]
+
+            # Fetch existing data to check for duplicates
+            existing_df = pd.DataFrame(
+                supabase_cred_jules.table("game_data")
+                .select("date,sender,game")
+                .execute()
+                .data
+            )
+            if not existing_df.empty:
+                existing_set = set(
+                    zip(existing_df["date"], existing_df["sender"], existing_df["game"])
+                )
+
+                # Filter to only new rows
+                new_df = df[
+                    ~df.apply(
+                        lambda row: (row["date"], row["sender"], row["game"])
+                        in existing_set,
+                        axis=1,
+                    )
+                ]
+
+                if not new_df.empty:
+                    supabase_cred_jules.table("game_data").insert(
+                        new_df.to_dict(orient="records"),
+                    ).execute()
+                    st.success(f"Added {len(new_df)} new game entries!")
+                else:
+                    st.info("No new entries to add.")
+            else:
+                supabase_cred_jules.table("game_data").insert(
+                    df.to_dict(orient="records"),
+                ).execute()
+                st.success(f"Added {len(df)} game entries!")
+        else:
+            df = pd.DataFrame()  # Empty if no file uploaded
+    return df, use_existing
 
 
 ############################### Streamlit App #####################################
@@ -89,17 +122,31 @@ def streamlit_app(GAMES: list[str] = GAMES):
 
     st.title("LinkedIn Mini Games Leaderboard")
 
-    df = load_data_from_supabase()
+    df, mode = load_data_from_supabase()
 
-    if df is None or df.empty:
+    if (mode == "Upload New Data" and df.empty) or (
+        mode == "Use Stored Data" and df.empty
+    ):
+        st.info("Please upload a WhatsApp chat .txt file to load new data.")
+        return (
+            "All",
+            {},
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+        )
+    elif df is None or df.empty:
         st.warning("No data available. Please upload a new WhatsApp chat .txt file.")
         return (
-            day_filter,
-            per_game_rankings,
-            total_score,
-            final_total_times,
-            final_daily_avg_times,
-            overall_best_sum,
+            "All",
+            {},
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
+            pd.DataFrame(),
             pd.DataFrame(),
             pd.DataFrame(),
         )
@@ -479,9 +526,14 @@ def head_to_head_page():
     """1v1 head-to-head comparison between two players."""
     st.title("1v1 Head-to-Head")
 
-    df = load_data_from_supabase()
+    df, mode = load_data_from_supabase()
     if df is None or df.empty:
-        st.warning("No data available yet.")
+        if mode == "Upload New Data":
+            st.info(
+                "Please upload a WhatsApp chat .txt file to load data for head-to-head comparison."
+            )
+        else:
+            st.warning("No data available yet.")
         return
 
     players = sorted(df["sender"].unique())
