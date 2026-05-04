@@ -46,7 +46,7 @@ deploy(){
         kubectl apply -f deployment.yaml
 
         IP_ADDRESS=$(kubectl get svc linkedin-games-ranking -o jsonpath='{.status.loadBalancer.ingress[0].externalIP}')
-        if $DOMAIN; then
+        if [[ -n $DOMAIN ]]; then
             echo "Deployment complete. Access the application at https://$DOMAIN"
         else
             echo "Deployment complete. Access the application at http://$IP_ADDRESS:80"
@@ -61,7 +61,7 @@ deploy(){
         kubectl set image deployment/linkedin-games-ranking linkedin-games-ranking=julescrevola/linkedin-games@$IMAGE_DIGEST
 
         IP_ADDRESS=$(kubectl get svc linkedin-games-ranking -o jsonpath='{.status.loadBalancer.ingress[0].externalIP}')
-        if $DOMAIN; then
+        if [[ -n $DOMAIN ]]; then
             echo "Deployment updated. Access the application at https://$DOMAIN"
         else
             echo "Deployment updated. Access the application at http://$IP_ADDRESS:80"
