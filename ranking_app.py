@@ -47,6 +47,18 @@ def load_data_from_supabase():
         horizontal=True,
     )
     if use_existing == "Use Stored Data":
+        # Delete rows in Supabase for which sender or game is not in the PLAYERS or GAMES list
+        supabase_cred_jules.table("game_data").delete().match(
+            {
+                "game": GAMES,
+            }
+        ).execute()
+        supabase_cred_jules.table("game_data").delete().match(
+            {
+                "sender": PLAYERS,
+            }
+        ).execute()
+        # Load data in dataframe from Supabase
         df = pd.DataFrame(
             (
                 supabase_cred_jules.table("game_data")
@@ -55,6 +67,7 @@ def load_data_from_supabase():
                 .execute()
             ).data
         ).drop_duplicates(subset=["date", "sender", "game"])
+
     else:
         uploaded_file = st.file_uploader(
             "Upload new WhatsApp chat (.txt)", type=["txt"]
