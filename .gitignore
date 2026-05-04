@@ -1,6 +1,9 @@
 # Virtualenv
 .venv/
 
+# Env variables
+.env
+
 # Data
 *chat*.txt
 *.csv

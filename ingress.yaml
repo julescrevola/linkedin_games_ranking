@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-dns
+  name: ingress-linkedin-games-ranking
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: linkedin-games-ranking.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: linkedin-games-ranking
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+      - backend:
+          service:
+            name: linkedin-games-ranking
+            port:
+              number: 80
+        path: /api
+        pathType: Prefix
+  tls:
+  - hosts:
+    - linkedin-games-ranking.com
+    secretName: linkedin-games-ranking-tls
