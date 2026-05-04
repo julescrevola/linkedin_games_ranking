@@ -100,4 +100,29 @@ Then run `deploy`. It will create a new deployment names *linkedin-games-ranking
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
+### Connect to your domain
+
+If you have bought a domain name (I got mine on [GoDaddy](https://www.godaddy.com/)), you can connect to it so that you use HTTPS instead of HTTP.
+
+**Make sure to rename `.env.example` to `.env`, fill in the empty variables and load them in your terminal with `source .env`.**
+
+First, provision an Azure DNS Zone with:
+```bash
+az network dns zone create --resource-group $DNS_ZONE_RG --name $DNS_ZONE_NAME
+```
+Then, go to your domain provider, and in Name Servers, add the following 4 URLs (remove all the others):
+```txt
+ns1-01.azure-dns.com
+ns2-01.azure-dns.net
+ns3-01.azure-dns.org
+ns4-01.azure-dns.info
+```
+This will ensure that DNS is dealt with by Azure directly.
+
+Make sure that you still have aliases loaded in the terminal with `source cli_aliases.sh`, then run the command `host` in your terminal.
+
+For reference, I helped myself with these:
+- https://dev.to/aadarsh-nagrath/setting-up-https-on-kubernetes-with-cert-manager-and-lets-encrypt-45e6
+- https://dev.to/peterj/expose-a-kubernetes-service-on-your-own-custom-domain-52dd
+
 **You are ready to create your own ranking!**
