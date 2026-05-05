@@ -64,7 +64,7 @@ def load_data_from_supabase():
                 .order("uploaded_at", desc=True)
                 .execute()
             ).data
-        ).drop_duplicates(subset=["date", "sender", "game"])
+        ).drop_duplicates(subset=["date", "sender", "game", "game_number"])
 
     else:
         uploaded_file = st.file_uploader(
@@ -72,21 +72,42 @@ def load_data_from_supabase():
         )
         if uploaded_file is not None:
             df = parse_whatsapp_chat(uploaded_file).drop_duplicates(
-                subset=["date", "sender", "game"]
+                subset=["date", "sender", "game", "game_number"]
             )
             df = df[df["game"].isin(GAMES)]
             df = df[df["sender"].isin(PLAYERS)]
 
-            # Fetch existing data to check for duplicates
+            # Fetch existing data with all fields to check for incomplete entries
             existing_df = pd.DataFrame(
-                supabase_cred_jules.table("game_data")
-                .select("date,sender,game")
-                .execute()
-                .data
+                supabase_cred_jules.table("game_data").select("*").execute().data
             )
             if not existing_df.empty:
-                existing_set = set(
-                    zip(existing_df["date"], existing_df["sender"], existing_df["game"])
+                # Delete entries where game_number is null
+                incomplete_mask = existing_df["game_number"].isna() | (
+                    existing_df["game_number"] == ""
+                )
+                incomplete_entries = existing_df[incomplete_mask]
+                for _, row in incomplete_entries.iterrows():
+                    supabase_cred_jules.table("game_data").delete().match(
+                        {
+                            "date": row["date"],
+                            "sender": row["sender"],
+                            "game": row["game"],
+                        }
+                    ).execute()
+
+                # Create set of existing entries (date, sender, game) to avoid duplicates
+                complete_entries = existing_df[~incomplete_mask]
+                existing_set = (
+                    set(
+                        zip(
+                            complete_entries["date"],
+                            complete_entries["sender"],
+                            complete_entries["game"],
+                        )
+                    )
+                    if not complete_entries.empty
+                    else set()
                 )
 
                 # Filter to only new rows
@@ -109,7 +130,7 @@ def load_data_from_supabase():
                 supabase_cred_jules.table("game_data").insert(
                     df.to_dict(orient="records"),
                 ).execute()
-                st.success(f"Added {len(df)} game entries!")
+                st.success(f"Added {len(df)} new game entries!")
         else:
             df = pd.DataFrame()  # Empty if no file uploaded
     return df, use_existing
