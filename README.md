@@ -89,7 +89,7 @@ streamlit run ranking_app.py
 
 ### Deploy to your own Kubernetes cluster
 
-**This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with other method and change the code accordingly for your usage.**
+**This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
 Provision the AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
