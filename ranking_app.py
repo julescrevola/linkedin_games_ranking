@@ -4,7 +4,7 @@ from supabase import create_client
 from linkedin_games_parser import parse_whatsapp_chat
 
 
-# Constants
+# Constants - Modify for your own ranking
 GAMES = ["Zip", "Tango", "Queens", "Mini Sudoku", "Patches"]
 PLAYERS = [
     "Antonio Ventura",
@@ -22,7 +22,7 @@ PLAYERS = [
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-supabase_cred_jules = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_cred = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 ################################### Tools #########################################
@@ -48,18 +48,18 @@ def load_data_from_supabase():
     )
     if use_existing == "Use Stored Data":
         # Delete rows in Supabase for which sender or game is not in the PLAYERS or GAMES list
-        supabase_cred_jules.table("game_data").delete().not_.in_(
+        supabase_cred.table("game_data").delete().not_.in_(
             "game",
             GAMES,
         ).execute()
-        supabase_cred_jules.table("game_data").delete().not_.in_(
+        supabase_cred.table("game_data").delete().not_.in_(
             "sender",
             PLAYERS,
         ).execute()
         # Load data in dataframe from Supabase
         df = pd.DataFrame(
             (
-                supabase_cred_jules.table("game_data")
+                supabase_cred.table("game_data")
                 .select("*")
                 .order("uploaded_at", desc=True)
                 .execute()
@@ -79,7 +79,7 @@ def load_data_from_supabase():
 
             # Fetch existing data with all fields to check for incomplete entries
             existing_df = pd.DataFrame(
-                supabase_cred_jules.table("game_data").select("*").execute().data
+                supabase_cred.table("game_data").select("*").execute().data
             )
             if not existing_df.empty:
                 # Delete entries where game_number is null
@@ -88,7 +88,7 @@ def load_data_from_supabase():
                 )
                 incomplete_entries = existing_df[incomplete_mask]
                 for _, row in incomplete_entries.iterrows():
-                    supabase_cred_jules.table("game_data").delete().match(
+                    supabase_cred.table("game_data").delete().match(
                         {
                             "date": row["date"],
                             "sender": row["sender"],
@@ -120,14 +120,14 @@ def load_data_from_supabase():
                 ]
 
                 if not new_df.empty:
-                    supabase_cred_jules.table("game_data").insert(
+                    supabase_cred.table("game_data").insert(
                         new_df.to_dict(orient="records"),
                     ).execute()
                     st.success(f"Added {len(new_df)} new game entries!")
                 else:
                     st.info("No new entries to add.")
             else:
-                supabase_cred_jules.table("game_data").insert(
+                supabase_cred.table("game_data").insert(
                     df.to_dict(orient="records"),
                 ).execute()
                 st.success(f"Added {len(df)} new game entries!")
