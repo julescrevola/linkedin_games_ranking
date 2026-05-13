@@ -80,7 +80,7 @@ python ranking.py --day <YYYY-MM-DD>
 ```
 ### As a Streamlit app
 
-First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account. To do so, you can copy `.streamlit.secrets.example.toml` and rename it, then change the values inside.
+First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account. To do so, you can copy `.streamlit/secrets.example.toml` and rename it, then change the values inside.
 
 Run in your terminal:
 ```bash
