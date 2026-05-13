@@ -82,42 +82,20 @@ def load_data_from_supabase():
                 supabase_cred.table("game_data").select("*").execute().data
             )
             if not existing_df.empty:
-                # Delete entries where game_number is null
-                incomplete_mask = existing_df["game_number"].isna() | (
-                    existing_df["game_number"] == ""
+                # Compute diff between existing_df and df and keep only entries that are not in existing_df
+                new_df = pd.merge(
+                    df,
+                    existing_df,
+                    on=["date", "sender", "game", "game_number"],
+                    how="left",
+                    indicator=True,
+                    suffixes=("", "_y"),
+                ).query('_merge == "left_only"')
+                new_df.drop(columns=["_merge", "id", "uploaded_at"], inplace=True)
+                new_df.drop(
+                    columns=[col for col in new_df.columns if col.endswith("_y")],
+                    inplace=True,
                 )
-                incomplete_entries = existing_df[incomplete_mask]
-                for _, row in incomplete_entries.iterrows():
-                    supabase_cred.table("game_data").delete().match(
-                        {
-                            "date": row["date"],
-                            "sender": row["sender"],
-                            "game": row["game"],
-                        }
-                    ).execute()
-
-                # Create set of existing entries (date, sender, game) to avoid duplicates
-                complete_entries = existing_df[~incomplete_mask]
-                existing_set = (
-                    set(
-                        zip(
-                            complete_entries["date"],
-                            complete_entries["sender"],
-                            complete_entries["game"],
-                        )
-                    )
-                    if not complete_entries.empty
-                    else set()
-                )
-
-                # Filter to only new rows
-                new_df = df[
-                    ~df.apply(
-                        lambda row: (row["date"], row["sender"], row["game"])
-                        in existing_set,
-                        axis=1,
-                    )
-                ]
 
                 if not new_df.empty:
                     supabase_cred.table("game_data").insert(
@@ -131,6 +109,15 @@ def load_data_from_supabase():
                     df.to_dict(orient="records"),
                 ).execute()
                 st.success(f"Added {len(df)} new game entries!")
+            # Reload data in dataframe from Supabase
+            df = pd.DataFrame(
+                (
+                    supabase_cred.table("game_data")
+                    .select("*")
+                    .order("uploaded_at", desc=True)
+                    .execute()
+                ).data
+            ).drop_duplicates(subset=["date", "sender", "game", "game_number"])
         else:
             df = pd.DataFrame()  # Empty if no file uploaded
     return df, use_existing
