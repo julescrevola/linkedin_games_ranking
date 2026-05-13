@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Load env ariables
+# Load env variables
 set -a
 source .env
 set +a
@@ -16,8 +16,7 @@ envc() {
         uv sync
 
         # Activate the new environment
-        echo "Activating new environment: $ENV_NAME"
-        source .venv/Scripts/activate
+        enva
     fi
 }
 
