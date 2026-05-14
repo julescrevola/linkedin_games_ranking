@@ -47,6 +47,20 @@ stages:
           - download: current
             artifact: manifests
 
+          - script: |
+              mkdir -p .streamlit
+              cat <<EOF > .streamlit/secrets.toml
+              SUPABASE_URL = "$(SUPABASE_URL)"
+              SUPABASE_KEY = "$(SUPABASE_KEY)"
+              EOF
+            displayName: Create secrets.toml
+
+          - script: |
+              kubectl create secret generic streamlit-secrets \
+                --from-file=secrets.toml=.streamlit/secrets.toml \
+                --dry-run=client -o yaml | kubectl apply -f -
+            displayName: Create Kubernetes secret
+
           - task: KubernetesManifest@1
             displayName: Create imagePullSecret
             inputs:
