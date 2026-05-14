@@ -28,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: 3.13
 
       - name: Install dependencies
         run: |
@@ -80,6 +80,20 @@ jobs:
       - name: Configure AKS credentials
         run: |
           az aks get-credentials --resource-group ${{ secrets.AKS_RG }} --name ${{ secrets.AKS_NAME }} --overwrite-existing
+
+      - name: Create secrets.toml
+        run: |
+          mkdir -p .streamlit
+          cat <<EOF > .streamlit/secrets.toml
+          SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"
+          SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"
+          EOF
+
+      - name: Create Kubernetes secret
+        run: |
+          kubectl create secret generic streamlit-secrets \
+            --from-file=secrets.toml=.streamlit/secrets.toml \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply Kubernetes deployment
         run: |
