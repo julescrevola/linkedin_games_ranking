@@ -26,7 +26,7 @@ stages:
         tags: |
           $(tag)
 
-    - publish: '$(Build.SourcesDirectory)/deployment.yaml'
+    - publish: '$(Build.SourcesDirectory)'
       artifact: manifests
 
 - stage: Deploy
@@ -50,8 +50,8 @@ stages:
           - script: |
               mkdir -p .streamlit
               cat <<EOF > .streamlit/secrets.toml
-              "SUPABASE_URL" = "$(SUPABASE_URL)"
-              "SUPABASE_KEY" = "$(SUPABASE_KEY)"
+              SUPABASE_URL = "$(SUPABASE_URL)"
+              SUPABASE_KEY = "$(SUPABASE_KEY)"
               EOF
             displayName: Create secrets.toml
 
