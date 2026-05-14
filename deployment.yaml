@@ -17,6 +17,14 @@ spec:
       containers:
       - name: linkedin-games-ranking
         image: julescrevola/linkedin-games:latest
+        volumeMounts:
+        - name: streamlit-secrets
+          mountPath: /linkedin_games_ranking/.streamlit
+          readOnly: true
+          volumes:
+          - name: streamlit-secrets
+            secret:
+              secretName: streamlit-secrets
         ports:
         - containerPort: 8501
 
