@@ -50,16 +50,26 @@ stages:
           - script: |
               mkdir -p .streamlit
               cat <<EOF > .streamlit/secrets.toml
-              SUPABASE_URL = "$(SUPABASE_URL)"
-              SUPABASE_KEY = "$(SUPABASE_KEY)"
+              "SUPABASE_URL" = "$(SUPABASE_URL)"
+              "SUPABASE_KEY" = "$(SUPABASE_KEY)"
               EOF
             displayName: Create secrets.toml
 
-          - script: |
-              kubectl create secret generic streamlit-secrets \
-                --from-file=secrets.toml=.streamlit/secrets.toml \
-                --dry-run=client -o yaml | kubectl apply -f -
+          - task: AzureCLI@2
             displayName: Create Kubernetes secret
+            inputs:
+              azureSubscription: service-connection-linkedin-games-ranking
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az aks get-credentials \
+                  --resource-group rg-linkedin_games \
+                  --name linkedin_games_ranking \
+                  --overwrite-existing
+
+                kubectl create secret generic streamlit-secrets \
+                  --from-file=secrets.toml=.streamlit/secrets.toml \
+                  --dry-run=client -o yaml | kubectl apply -f -
 
           - task: KubernetesManifest@1
             displayName: Create imagePullSecret
