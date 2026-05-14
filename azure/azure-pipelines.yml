@@ -26,7 +26,7 @@ stages:
         tags: |
           $(tag)
 
-    - publish: '$(Build.SourcesDirectory)'
+    - publish: '$(Build.SourcesDirectory)/deployment.yaml'
       artifact: manifests
 
 - stage: Deploy
