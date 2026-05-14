@@ -21,12 +21,12 @@ spec:
         - name: streamlit-secrets
           mountPath: /linkedin_games_ranking/.streamlit
           readOnly: true
-          volumes:
-          - name: streamlit-secrets
-            secret:
-              secretName: streamlit-secrets
         ports:
         - containerPort: 8501
+      volumes:
+      - name: streamlit-secrets
+        secret:
+          secretName: streamlit-secrets
 
 ---
 
