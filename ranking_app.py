@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import datetime
 from supabase import create_client
 from linkedin_games_parser import parse_whatsapp_chat
 
@@ -46,24 +47,60 @@ def clean_supabase_duplicate_game_entries():
     if existing_df.empty:
         return
 
-    existing_df["date"] = pd.to_datetime(
-        existing_df["date"], format="%Y-%m-%d", errors="coerce"
+    existing_df["date"] = pd.to_datetime(existing_df["date"], format="%Y-%m-%d")
+    existing_df = existing_df.sort_values(["sender", "game", "game_number", "date"])
+    # If the same game/game_number appears on a later date,
+    # shift the later row back by one day.
+    try:
+        grouped = existing_df.groupby(["game", "game_number"])
+    except Exception:
+        grouped = []
+
+    shift_indices = []
+    for _, group in grouped:
+        if len(group) < 2:
+            continue
+        # For each row in the group, if an earlier date exists for the same game/game_number,
+        # mark it to shift back one day.
+        for _, row in group.iterrows():
+            d = row.get("date")
+            if pd.isna(d):
+                continue
+            if (group["date"] < d).any():
+                shift_indices.append(row.get("id"))
+
+    # Apply shifts in-memory first
+    if shift_indices:
+        for idx in shift_indices:
+            existing_df.loc[existing_df["id"] == idx, "date"] -= datetime.timedelta(
+                days=1
+            )
+
+    # Recompute duplicates after potential date shifts
+    duplicates_to_remove = existing_df.duplicated(
+        subset=["sender", "game", "game_number"], keep="first"
     )
+
+    # Persist any date shifts back to Supabase if we have ids
+    if "id" in existing_df.columns and shift_indices:
+        # Prepare updates for changed rows
+        for idx in shift_indices:
+            try:
+                row = existing_df.loc[existing_df["id"] == idx]
+                if "id" in row and pd.notna(row["id"]) and pd.notna(row["date"]):
+                    supabase_cred.table("game_data").update(
+                        {"date": row["date"].strftime("%Y-%m-%d")}
+                    ).eq("id", row["id"]).execute()
+            except Exception:
+                # Ignore single-row update failures and continue
+                continue
+
     if "id" not in existing_df.columns:
         return
 
-    existing_df = existing_df.sort_values(["game", "game_number", "date"])
-
-    ids_to_remove = []
-    for _, group in existing_df.groupby(["game", "game_number"]):
-        if len(group) < 2:
-            continue
-        min_date = group["date"].min()
-        later_rows = group[group["date"] > min_date]
-        ids_to_remove.extend(later_rows["id"].tolist())
+    ids_to_remove = existing_df.loc[duplicates_to_remove, "id"].tolist()
 
     if ids_to_remove:
-        ids_to_remove = list(dict.fromkeys(ids_to_remove))
         supabase_cred.table("game_data").delete().in_("id", ids_to_remove).execute()
 
 
