@@ -39,6 +39,34 @@ def time_to_seconds(time_str):
         return None
 
 
+def clean_supabase_duplicate_game_entries():
+    existing_df = pd.DataFrame(
+        supabase_cred.table("game_data").select("*").execute().data
+    )
+    if existing_df.empty:
+        return
+
+    existing_df["date"] = pd.to_datetime(
+        existing_df["date"], format="%Y-%m-%d", errors="coerce"
+    )
+    if "id" not in existing_df.columns:
+        return
+
+    existing_df = existing_df.sort_values(["game", "game_number", "date"])
+
+    ids_to_remove = []
+    for _, group in existing_df.groupby(["game", "game_number"]):
+        if len(group) < 2:
+            continue
+        min_date = group["date"].min()
+        later_rows = group[group["date"] > min_date]
+        ids_to_remove.extend(later_rows["id"].tolist())
+
+    if ids_to_remove:
+        ids_to_remove = list(dict.fromkeys(ids_to_remove))
+        supabase_cred.table("game_data").delete().in_("id", ids_to_remove).execute()
+
+
 # Load data from Supabase structured tables or from uploaded WhatsApp chat if data is outdated
 def load_data_from_supabase():
     use_existing = st.radio(
@@ -56,6 +84,7 @@ def load_data_from_supabase():
             "sender",
             PLAYERS,
         ).execute()
+        clean_supabase_duplicate_game_entries()
         # Load data in dataframe from Supabase
         df = pd.DataFrame(
             (
@@ -109,6 +138,8 @@ def load_data_from_supabase():
                     df.to_dict(orient="records"),
                 ).execute()
                 st.success(f"Added {len(df)} new game entries!")
+
+            clean_supabase_duplicate_game_entries()
             # Reload data in dataframe from Supabase
             df = pd.DataFrame(
                 (
