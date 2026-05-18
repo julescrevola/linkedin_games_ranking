@@ -87,7 +87,7 @@ Run in your terminal:
 streamlit run ranking_app.py
 ```
 
-### Deploy to your own Kubernetes cluster
+## Deploy to your own Kubernetes cluster
 
 **This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
 
@@ -102,7 +102,7 @@ Make sure your Docker Engine or Docker Desktop is running, then run `deploy`. It
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
-### Connect to your domain
+## Connect to your domain
 
 If you have bought a domain name (I got mine on [GoDaddy](https://www.godaddy.com/)), you can connect to it so that you use HTTPS instead of HTTP.
 
