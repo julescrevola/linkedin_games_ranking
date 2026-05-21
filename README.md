@@ -98,7 +98,7 @@ Remember to load aliases with:
 ```bash
 source cli-aliases.sh
 ```
-Make sure your Docker Engine or Docker Desktop is running, then run `deploy`. It will create a new deployment names *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
+Make sure your Docker Engine or Docker Desktop is running, then run `deploy`. It will create a new deployment named *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
