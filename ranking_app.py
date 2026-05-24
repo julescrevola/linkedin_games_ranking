@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import datetime
 from supabase import create_client
 from linkedin_games_parser import parse_whatsapp_chat
 
@@ -40,70 +39,6 @@ def time_to_seconds(time_str):
         return None
 
 
-def clean_supabase_duplicate_game_entries():
-    existing_df = pd.DataFrame(
-        supabase_cred.table("game_data").select("*").execute().data
-    )
-    if existing_df.empty:
-        return
-
-    existing_df["date"] = pd.to_datetime(existing_df["date"], format="%Y-%m-%d")
-    existing_df = existing_df.sort_values(["sender", "game", "game_number", "date"])
-    # If the same game/game_number appears on a later date,
-    # shift the later row back by one day.
-    try:
-        grouped = existing_df.groupby(["game", "game_number"])
-    except Exception:
-        grouped = []
-
-    shift_indices = []
-    for _, group in grouped:
-        if len(group) < 2:
-            continue
-        # For each row in the group, if an earlier date exists for the same game/game_number,
-        # mark it to shift back one day.
-        for _, row in group.iterrows():
-            d = row.get("date")
-            if pd.isna(d):
-                continue
-            if (group["date"] < d).any():
-                shift_indices.append(row.get("id"))
-
-    # Apply shifts in-memory first
-    if shift_indices:
-        for idx in shift_indices:
-            existing_df.loc[existing_df["id"] == idx, "date"] -= datetime.timedelta(
-                days=1
-            )
-
-    # Recompute duplicates after potential date shifts
-    duplicates_to_remove = existing_df.duplicated(
-        subset=["sender", "game", "game_number"], keep="first"
-    )
-
-    # Persist any date shifts back to Supabase if we have ids
-    if "id" in existing_df.columns and shift_indices:
-        # Prepare updates for changed rows
-        for idx in shift_indices:
-            try:
-                row = existing_df.loc[existing_df["id"] == idx]
-                if "id" in row and pd.notna(row["id"]) and pd.notna(row["date"]):
-                    supabase_cred.table("game_data").update(
-                        {"date": row["date"].strftime("%Y-%m-%d")}
-                    ).eq("id", row["id"]).execute()
-            except Exception:
-                # Ignore single-row update failures and continue
-                continue
-
-    if "id" not in existing_df.columns:
-        return
-
-    ids_to_remove = existing_df.loc[duplicates_to_remove, "id"].tolist()
-
-    if ids_to_remove:
-        supabase_cred.table("game_data").delete().in_("id", ids_to_remove).execute()
-
-
 # Load data from Supabase structured tables or from uploaded WhatsApp chat if data is outdated
 def load_data_from_supabase():
     use_existing = st.radio(
@@ -121,7 +56,6 @@ def load_data_from_supabase():
             "sender",
             PLAYERS,
         ).execute()
-        clean_supabase_duplicate_game_entries()
         # Load data in dataframe from Supabase
         df = pd.DataFrame(
             (
@@ -142,41 +76,13 @@ def load_data_from_supabase():
             )
             df = df[df["game"].isin(GAMES)]
             df = df[df["sender"].isin(PLAYERS)]
+            # Delete all existing data in Supabase and insert new data
+            supabase_cred.table("game_data").delete().neq("id", 0).execute()
+            supabase_cred.table("game_data").insert(
+                df.to_dict(orient="records"),
+            ).execute()
+            st.success(f"Added {len(df)} game entries!")
 
-            # Fetch existing data with all fields to check for incomplete entries
-            existing_df = pd.DataFrame(
-                supabase_cred.table("game_data").select("*").execute().data
-            )
-            if not existing_df.empty:
-                # Compute diff between existing_df and df and keep only entries that are not in existing_df
-                new_df = pd.merge(
-                    df,
-                    existing_df,
-                    on=["date", "sender", "game", "game_number"],
-                    how="left",
-                    indicator=True,
-                    suffixes=("", "_y"),
-                ).query('_merge == "left_only"')
-                new_df.drop(columns=["_merge", "id", "uploaded_at"], inplace=True)
-                new_df.drop(
-                    columns=[col for col in new_df.columns if col.endswith("_y")],
-                    inplace=True,
-                )
-
-                if not new_df.empty:
-                    supabase_cred.table("game_data").insert(
-                        new_df.to_dict(orient="records"),
-                    ).execute()
-                    st.success(f"Added {len(new_df)} new game entries!")
-                else:
-                    st.info("No new entries to add.")
-            else:
-                supabase_cred.table("game_data").insert(
-                    df.to_dict(orient="records"),
-                ).execute()
-                st.success(f"Added {len(df)} new game entries!")
-
-            clean_supabase_duplicate_game_entries()
             # Reload data in dataframe from Supabase
             df = pd.DataFrame(
                 (
