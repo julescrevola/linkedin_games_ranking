@@ -19,3 +19,6 @@ __pycache__/linkedin_games_parser.cpython-312.pyc
 
 # Supabase secrets
 .streamlit/secrets.toml
+
+# Github Copilot
+.github/agents
