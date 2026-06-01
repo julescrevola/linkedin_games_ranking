@@ -76,12 +76,37 @@ def load_data_from_supabase():
             )
             df = df[df["game"].isin(GAMES)]
             df = df[df["sender"].isin(PLAYERS)]
-            # Delete all existing data in Supabase and insert new data
-            supabase_cred.table("game_data").delete().neq("id", 0).execute()
+            # Upload only new data to supabase
+            df_existing = pd.DataFrame(
+                (
+                    supabase_cred.table("game_data")
+                    .select("*")
+                    .order("uploaded_at", desc=True)
+                    .execute()
+                ).data
+            )
+            # Keep only rows from df that don't exist in df_existing
+            df_new = (
+                df.merge(
+                    df_existing,
+                    on=[
+                        "date",
+                        "sender",
+                        "game",
+                        "game_number",
+                        "play_time",
+                        "ceo_percent",
+                    ],
+                    how="left",
+                    indicator=True,
+                )
+                .query('_merge=="left_only"')
+                .drop(columns=["_merge", "id", "uploaded_at"])
+            )
             supabase_cred.table("game_data").insert(
-                df.to_dict(orient="records"),
+                df_new.to_dict(orient="records")
             ).execute()
-            st.success(f"Added {len(df)} game entries!")
+            st.success(f"Added {len(df_new)} game entries!")
 
             # Reload data in dataframe from Supabase
             df = pd.DataFrame(
@@ -102,8 +127,8 @@ def streamlit_app(GAMES: list[str] = GAMES):
     """Runs the Streamlit leaderboard app and returns ranking data."""
 
     st.image(
-        "anto.jpg",
-        caption="Antonio Roberto Ventura, 2026 Q1 Champion",
+        "anto.png",
+        caption="Antonio Roberto Ventura, 2026 Spring Champion",
     )
 
     per_game_rankings = {}
@@ -155,7 +180,7 @@ def streamlit_app(GAMES: list[str] = GAMES):
     filtered_df = df if day_filter == "All" else df[df["date"] == day_filter]
     if day_filter == "All":
         # Start date
-        default_start_date = "2026-04-01"
+        default_start_date = "2026-06-01"
         day_from = st.selectbox(
             f"Select the day from which to start the overall ranking (Defaults to {default_start_date})",
             options=[default_start_date] + unique_days,
