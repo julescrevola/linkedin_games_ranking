@@ -103,10 +103,13 @@ def load_data_from_supabase():
                 .query('_merge=="left_only"')
                 .drop(columns=["_merge", "id", "uploaded_at"])
             )
-            supabase_cred.table("game_data").insert(
-                df_new.to_dict(orient="records")
-            ).execute()
-            st.success(f"Added {len(df_new)} game entries!")
+            if not df_new.empty:
+                supabase_cred.table("game_data").insert(
+                    df_new.to_dict(orient="records")
+                ).execute()
+                st.success(f"Added {len(df_new)} game entries!")
+            else:
+                st.info("No new game entries to add.")
 
             # Reload data in dataframe from Supabase
             df = pd.DataFrame(
