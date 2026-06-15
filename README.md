@@ -9,7 +9,7 @@
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
 Find the Streamlit app [here](https://linkedin-games-ranking.com).
 
-Total score are computed by awarding the following points, per game per day:
+Total scores are computed by awarding the following points, per game per day:
 - 5 points for the best player
 - 3 points for the second-best player
 - 1 point for the third-best player
@@ -36,7 +36,7 @@ Then, run:
 ```bash
 source cli-aliases.sh
 ```
-This will make sure that the aliases are loaded in your bash terminal.
+This loads helper bash functions in your terminal.
 
 You can then install the environment with:
 ```bash
@@ -60,7 +60,7 @@ pre-commit install
 
 ## Run the scripts
 
-### In local:
+### Locally
 
 To run the scripts, you have 2 options:
 - If you wish, you can first run the parser script with (make sure that the input and output data paths are the right ones)
@@ -69,7 +69,7 @@ python linkedin_games_parser.py
 ```
 This way, you can see what the parsed data looks like.
 
-Then, you have 2 ways to run the `ranking.py` file and extract rankings:
+Then, you have 2 ways to run `ranking.py` and extract rankings:
 - Create leaderboards for each game for the whole chat history:
 ```bash
 python ranking.py
@@ -80,7 +80,7 @@ python ranking.py --day <YYYY-MM-DD>
 ```
 ### As a Streamlit app
 
-First, set up the file `.streamlit/secrets.toml`, in which you put your SUPABASE_URL and SUPABASE_KEY from your Supabase account. To do so, you can copy `.streamlit/secrets.example.toml` and rename it, then change the values inside.
+Configure Supabase credentials by copying `.streamlit/secrets.example.toml` and renaming it to `.streamlit/secrets.toml`, then filling in `SUPABASE_URL` and `SUPABASE_KEY` (for AKS) and/or `supabase-url` and `supabase-key` (for ACA).
 
 Run in your terminal:
 ```bash
@@ -92,13 +92,17 @@ streamlit run ranking_app.py
 **This repo is using an [Azure Container App](https://learn.microsoft.com/fr-fr/azure/container-apps/) or a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
-Provision the ACA or AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
+Provision ACA or AKS in Azure, either manually in the Azure Portal or with Azure CLI.
 
-Remember to load aliases with:
+Load helpers with:
 ```bash
 source cli-aliases.sh
 ```
-Make sure your Docker Engine or Docker Desktop is running, then run `deploy_aca` for the ACA or `deploy_aks` for the AKS. It will create a new deployment named *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
+Make sure Docker is running, then run:
+- `deploy_aca` for Azure Container Apps
+- `deploy_aks` for AKS
+
+These commands build and push the Docker image, then create or update the target deployment.
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
@@ -106,7 +110,7 @@ You can then go to the URL displayed in the terminal when the deployment is done
 
 If you have bought a domain name (I got mine on [GoDaddy](https://www.godaddy.com/)), you can connect to it so that you use HTTPS instead of HTTP.
 
-**Make sure to rename `.env.example` to `.env`, fill in the empty variables and load them in your terminal with `source .env`.**
+**Make sure to rename `.env.example` to `.env`, fill in required variables, and load them with `source .env`.**
 
 First, provision an Azure DNS Zone with:
 ```bash
@@ -121,9 +125,11 @@ ns4-01.azure-dns.info
 ```
 This will ensure that DNS is dealt with by Azure directly.
 
-Make sure that you still have aliases loaded in the terminal with `source cli_aliases.sh`, then run the command `host` in your terminal.
+Make sure helpers are loaded with `source cli-aliases.sh`, then run:
+- `host_aks` for AKS
+- `host_aca` for ACA
 
-For reference, I helped myself with these:
+For reference, I helped myself with these for AKS:
 - https://dev.to/aadarsh-nagrath/setting-up-https-on-kubernetes-with-cert-manager-and-lets-encrypt-45e6
 - https://dev.to/peterj/expose-a-kubernetes-service-on-your-own-custom-domain-52dd
 
