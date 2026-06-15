@@ -87,18 +87,18 @@ Run in your terminal:
 streamlit run ranking_app.py
 ```
 
-## Deploy to your own Kubernetes cluster
+## Deploy to your own Kubernetes cluster or Azure Container App
 
-**This repo is using a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
+**This repo is using an [Azure Container App](https://learn.microsoft.com/fr-fr/azure/container-apps/) or a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
-Provision the AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
+Provision the ACA or AKS in Azure, either manually on your Azure Portal or [with the Azure CLI](https://learn.microsoft.com/en-us/azure/aks/learn/quick-windows-container-deploy-cli#create-an-aks-cluster).
 
 Remember to load aliases with:
 ```bash
 source cli-aliases.sh
 ```
-Make sure your Docker Engine or Docker Desktop is running, then run `deploy`. It will create a new deployment named *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
+Make sure your Docker Engine or Docker Desktop is running, then run `deploy_aca` for the ACA or `deploy_aks` for the AKS. It will create a new deployment named *linkedin-games-ranking* in your AKS cluster if it is the first time you set it up, or it will update it if it already exists.
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
