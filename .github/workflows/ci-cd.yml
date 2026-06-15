@@ -42,7 +42,7 @@ jobs:
   deploy:
     permissions:
       id-token: write
-    name: Deploy to AKS
+    name: Deploy to Azure Container Apps
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -77,29 +77,67 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Configure AKS credentials
-        run: |
-          az aks get-credentials --resource-group ${{ secrets.AKS_RG }} --name ${{ secrets.AKS_NAME }} --overwrite-existing
+      # AKS deployment steps kept as reference (disabled)
+      # - name: Configure AKS credentials
+      #   run: |
+      #     az aks get-credentials --resource-group ${{ secrets.RG }} --name ${{ secrets.AKS_NAME }} --overwrite-existing
+      #
+      # - name: Create secrets.toml
+      #   run: |
+      #     mkdir -p .streamlit
+      #     cat <<EOF > .streamlit/secrets.toml
+      #     SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"
+      #     SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"
+      #     EOF
+      #
+      # - name: Create Kubernetes secret
+      #   run: |
+      #     kubectl create secret generic streamlit-secrets \
+      #       --from-file=secrets.toml=.streamlit/secrets.toml \
+      #       --dry-run=client -o yaml | kubectl apply -f -
+      #
+      # - name: Apply Kubernetes deployment
+      #   run: |
+      #     kubectl apply -f deployment.yaml
+      #     kubectl set image deployment/linkedin-games-ranking linkedin-games-ranking=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --record
+      #
+      # - name: Wait for rollout
+      #   run: |
+      #     kubectl rollout status deployment/linkedin-games-ranking --timeout=3m
 
-      - name: Create secrets.toml
+      - name: Install Azure Container Apps extension
         run: |
-          mkdir -p .streamlit
-          cat <<EOF > .streamlit/secrets.toml
-          SUPABASE_URL = "${{ secrets.SUPABASE_URL }}"
-          SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"
-          EOF
+          az extension add --name containerapp --upgrade
 
-      - name: Create Kubernetes secret
+      - name: Deploy to Azure Container Apps
         run: |
-          kubectl create secret generic streamlit-secrets \
-            --from-file=secrets.toml=.streamlit/secrets.toml \
-            --dry-run=client -o yaml | kubectl apply -f -
+          APP_NAME="${{ secrets.ACA_NAME }}"
+          RESOURCE_GROUP="${{ secrets.RG }}"
+          IMAGE="${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
-      - name: Apply Kubernetes deployment
-        run: |
-          kubectl apply -f deployment.yaml
-          kubectl set image deployment/linkedin-games-ranking linkedin-games-ranking=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --record
+          if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+            az containerapp secret set \
+              --name "$APP_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}'
 
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/linkedin-games-ranking --timeout=3m
+            az containerapp update \
+              --name "$APP_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --image "$IMAGE" \
+              --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+          else
+            az containerapp create \
+              --name "$APP_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --environment '${{ secrets.ACA_ENV_NAME }}' \
+              --image "$IMAGE" \
+              --ingress external \
+              --target-port 8501 \
+              --cpu 0.5 \
+              --memory 1.0Gi \
+              --min-replicas 0 \
+              --max-replicas 1 \
+              --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}' \
+              --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+          fi
