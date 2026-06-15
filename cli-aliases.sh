@@ -25,7 +25,7 @@ enva() {
     source .venv/Scripts/activate
 }
 
-deploy(){
+docker() {
     echo "Building Docker image..."
     docker build -t linkedin-games .
 
@@ -34,7 +34,12 @@ deploy(){
 
     echo "Pushing Docker image to Docker Hub..."
     docker push julescrevola/linkedin-games:latest
+}
 
+deploy_aks() {
+    # Build and push to Docker
+    docker
+    # Deploy to AKS
     if kg deploy linkedin-games-ranking | grep -q "No resources found"; then
 
         echo "Creating new deployment..."
@@ -68,13 +73,27 @@ deploy(){
     fi
 }
 
-host(){
+deploy_aca() {
+    echo "Deploying to Azure Container Apps..."
+    az containerapp up \
+    --name "$ACA_NAME" \
+    --resource-group "$RG" \
+    --image julescrevola/linkedin-games:latest \
+    --target-port 80 \
+    --ingress 'external' \
+    --registry-server 'index.docker.io' \
+    --query properties.configuration.ingress.fqdn -o tsv
+
+    echo "Deployment complete. Access the application at https://$DOMAIN"
+}
+
+host_aks() {
     echo "▶ Using subscription $SUBSCRIPTION_ID"
     az account set --subscription "$SUBSCRIPTION_ID"
 
     echo "▶ Connecting kubectl to AKS..."
     az aks get-credentials \
-    -g "$AKS_RG" \
+    -g "$RG" \
     -n "$AKS_NAME" \
     --overwrite-existing
 
@@ -128,7 +147,7 @@ host(){
 
     echo "▶ Granting Azure DNS permissions to AKS system identity..."
     AKS_PRINCIPAL_ID=$(az aks show \
-    -g "$AKS_RG" \
+    -g "$RG" \
     -n "$AKS_NAME" \
     --query identity.principalId \
     -o tsv)
@@ -175,5 +194,7 @@ host(){
 # Export the functions to make them available in the shell
 export -f envc
 export -f enva
-export -f deploy
-export -f host
+export -f deploy_aks
+export -f host_aks
+export -f docker
+export -f deploy_aca
