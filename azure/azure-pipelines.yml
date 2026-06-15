@@ -6,6 +6,10 @@ variables:
   linkedinGamesRankingRepository: 'julescrevola/linkedin-games'
   tag: '$(Build.BuildId)'
   imagePullSecret: 'secret'
+  acaAppName: 'linkedin-games-ranking'
+  ResourceGroup: 'rg-linkedin_games'
+  acaEnvironment: 'aca-linkedin-games-ranking-env'
+  acaTargetPort: '8501'
 
 stages:
 - stage: Build
@@ -26,11 +30,11 @@ stages:
         tags: |
           $(tag)
 
-    - publish: '$(Build.SourcesDirectory)/deployment.yaml'
+    - publish: '$(Build.SourcesDirectory)'
       artifact: manifests
 
 - stage: Deploy
-  displayName: Deploy the containers
+  displayName: Deploy to Azure Container Apps
   dependsOn: Build
   jobs:
   - deployment: Deploy
@@ -47,54 +51,86 @@ stages:
           - download: current
             artifact: manifests
 
-          - script: |
-              mkdir -p .streamlit
-              cat <<EOF > .streamlit/secrets.toml
-              SUPABASE_URL = "$(SUPABASE_URL)"
-              SUPABASE_KEY = "$(SUPABASE_KEY)"
-              EOF
-            displayName: Create secrets.toml
+          # AKS deployment steps kept as reference (disabled)
+          # - script: |
+          #     mkdir -p .streamlit
+          #     cat <<EOF > .streamlit/secrets.toml
+          #     SUPABASE_URL = "$(SUPABASE_URL)"
+          #     SUPABASE_KEY = "$(SUPABASE_KEY)"
+          #     EOF
+          #   displayName: Create secrets.toml
+          #
+          # - task: AzureCLI@2
+          #   displayName: Create Kubernetes secret
+          #   inputs:
+          #     azureSubscription: service-connection-linkedin-games-ranking
+          #     scriptType: bash
+          #     scriptLocation: inlineScript
+          #     inlineScript: |
+          #       az aks get-credentials \
+          #         --resource-group rg-linkedin_games \
+          #         --name linkedin_games_ranking \
+          #         --overwrite-existing
+          #
+          #       kubectl create secret generic streamlit-secrets \
+          #         --from-file=secrets.toml=.streamlit/secrets.toml \
+          #         --dry-run=client -o yaml | kubectl apply -f -
+          #
+          # - task: KubernetesManifest@1
+          #   displayName: Create imagePullSecret
+          #   inputs:
+          #     action: createSecret
+          #     connectionType: azureResourceManager
+          #     secretName: $(imagePullSecret)
+          #     dockerRegistryEndpoint: 'service-connection-docker'
+          #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
+          #     azureResourceGroup: 'rg-linkedin_games'
+          #     kubernetesCluster: 'linkedin_games_ranking'
+          #     namespace: 'default'
+          #
+          # - task: KubernetesManifest@1
+          #   displayName: Deploy to Kubernetes cluster
+          #   inputs:
+          #     action: deploy
+          #     connectionType: azureResourceManager
+          #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
+          #     azureResourceGroup: 'rg-linkedin_games'
+          #     kubernetesCluster: 'linkedin_games_ranking'
+          #     namespace: 'default'
+          #     manifests: |
+          #       $(Pipeline.Workspace)/manifests/deployment.yaml
+          #     imagePullSecrets: |
+          #       $(imagePullSecret)
+          #     containers: |
+          #       $(RegistryName)/$(linkedinGamesRankingRepository):$(tag)
 
           - task: AzureCLI@2
-            displayName: Create Kubernetes secret
+            displayName: Deploy to Azure Container Apps
             inputs:
               azureSubscription: service-connection-linkedin-games-ranking
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                az aks get-credentials \
-                  --resource-group rg-linkedin_games \
-                  --name linkedin_games_ranking \
-                  --overwrite-existing
+                az extension add --name containerapp --upgrade
 
-                kubectl create secret generic streamlit-secrets \
-                  --from-file=secrets.toml=.streamlit/secrets.toml \
-                  --dry-run=client -o yaml | kubectl apply -f -
+                APP_NAME="$(acaAppName)"
+                RESOURCE_GROUP="$(acaResourceGroup)"
+                ENVIRONMENT_NAME="$(acaEnvironment)"
+                TARGET_PORT="$(acaTargetPort)"
+                IMAGE="$(linkedinGamesRankingRepository):$(tag)"
 
-          - task: KubernetesManifest@1
-            displayName: Create imagePullSecret
-            inputs:
-              action: createSecret
-              connectionType: azureResourceManager
-              secretName: $(imagePullSecret)
-              dockerRegistryEndpoint: 'service-connection-docker'
-              azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
-              azureResourceGroup: 'rg-linkedin_games'
-              kubernetesCluster: 'linkedin_games_ranking'
-              namespace: 'default'
+                if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+                  az containerapp secret set \
+                    --name "$APP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)"
 
-          - task: KubernetesManifest@1
-            displayName: Deploy to Kubernetes cluster
-            inputs:
-              action: deploy
-              connectionType: azureResourceManager
-              azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
-              azureResourceGroup: 'rg-linkedin_games'
-              kubernetesCluster: 'linkedin_games_ranking'
-              namespace: 'default'
-              manifests: |
-                $(Pipeline.Workspace)/manifests/deployment.yaml
-              imagePullSecrets: |
-                $(imagePullSecret)
-              containers: |
-                $(RegistryName)/$(linkedinGamesRankingRepository):$(tag)
+                  az containerapp update \
+                    --name "$APP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --image "$IMAGE" \
+                    --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+                else
+                  echo "Error: ACA environment '$ENVIRONMENT_NAME' does not exist in resource group '$RESOURCE_GROUP'."
+                  exit 1
+                fi
