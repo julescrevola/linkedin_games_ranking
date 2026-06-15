@@ -114,7 +114,7 @@ stages:
                 az extension add --name containerapp --upgrade
 
                 APP_NAME="$(acaAppName)"
-                RESOURCE_GROUP="$(acaResourceGroup)"
+                RESOURCE_GROUP="$(ResourceGroup)"
                 ENVIRONMENT_NAME="$(acaEnvironment)"
                 TARGET_PORT="$(acaTargetPort)"
                 IMAGE="$(linkedinGamesRankingRepository):$(tag)"
@@ -131,6 +131,17 @@ stages:
                     --image "$IMAGE" \
                     --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
                 else
-                  echo "Error: ACA environment '$ENVIRONMENT_NAME' does not exist in resource group '$RESOURCE_GROUP'."
-                  exit 1
+                  az containerapp create \
+                    --name "$APP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --environment "$ENVIRONMENT_NAME" \
+                    --image "$IMAGE" \
+                    --ingress external \
+                    --target-port "$TARGET_PORT" \
+                    --cpu 0.5 \
+                    --memory 1.0Gi \
+                    --min-replicas 0 \
+                    --max-replicas 1 \
+                    --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)" \
+                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
                 fi

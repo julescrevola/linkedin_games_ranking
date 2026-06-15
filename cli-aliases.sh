@@ -25,7 +25,7 @@ enva() {
     source .venv/Scripts/activate
 }
 
-docker() {
+docker_build_push() {
     echo "Building Docker image..."
     docker build -t linkedin-games .
 
@@ -38,7 +38,7 @@ docker() {
 
 deploy_aks() {
     # Build and push to Docker
-    docker
+    docker_build_push
     # Deploy to AKS
     if kg deploy linkedin-games-ranking | grep -q "No resources found"; then
 
@@ -74,17 +74,123 @@ deploy_aks() {
 }
 
 deploy_aca() {
+    # Build and push to Docker
+    docker_build_push
+    # Deploy to ACA
     echo "Deploying to Azure Container Apps..."
-    az containerapp up \
-    --name "$ACA_NAME" \
-    --resource-group "$RG" \
-    --image julescrevola/linkedin-games:latest \
-    --target-port 80 \
-    --ingress 'external' \
-    --registry-server 'index.docker.io' \
-    --query properties.configuration.ingress.fqdn -o tsv
+    if az containerapp show --name "$ACA_NAME" --resource-group "$RG" >/dev/null 2>&1; then
+        az containerapp secret set \
+            --name "$ACA_NAME" \
+            --resource-group "$RG" \
+            --secrets supabase-url="$SUPABASE_URL" supabase-key="$SUPABASE_KEY"
 
-    echo "Deployment complete. Access the application at https://$DOMAIN"
+        az containerapp update \
+            --name "$ACA_NAME" \
+            --resource-group "$RG" \
+            --image julescrevola/linkedin-games:latest \
+            --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+        echo "Deployment complete. Access the application at https://$DOMAIN"
+    else
+        az containerapp create \
+            --name "$ACA_NAME" \
+            --resource-group "$RG" \
+            --image julescrevola/linkedin-games:latest \
+            --environment "$ACA_ENV_NAME" \
+            --target-port 8501 \
+            --ingress 'external' \
+            --registry-server 'index.docker.io' \
+            --registry-username "$DOCKERHUB_USERNAME" \
+            --registry-password "$DOCKERHUB_PASSWORD" \
+            --secrets supabase-url="$SUPABASE_URL" supabase-key="$SUPABASE_KEY" \
+            --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+        IP_ADDRESS=$(nslookup $(az containerapp show --name "$ACA_NAME" --resource-group "$RG" --query properties.configuration.ingress.fqdn -o tsv) | grep 'Address' | tail -n1 | awk '{print $2}')
+        echo "Deployment complete. Change the DNS records to point to the new Container App IP address : $IP_ADDRESS, and access the application at https://$DOMAIN"
+    fi
+}
+
+host_aca() {
+    echo "▶ Resolving Container App endpoint..."
+    ACA_FQDN=$(az containerapp show \
+        --name "$ACA_NAME" \
+        --resource-group "$RG" \
+        --query properties.configuration.ingress.fqdn \
+        -o tsv)
+
+    if [[ -z "$ACA_FQDN" ]]; then
+        echo "Could not resolve ACA FQDN. Ensure ingress is enabled on the container app."
+        return 1
+    fi
+
+    ACA_IP=$(nslookup "$ACA_FQDN" | awk '/^Address: /{print $2}' | tail -n1)
+    if [[ -z "$ACA_IP" ]]; then
+        echo "Could not resolve ACA IP from FQDN: $ACA_FQDN"
+        return 1
+    fi
+
+    ASUID_VALUE=$(az containerapp show \
+        --name "$ACA_NAME" \
+        --resource-group "$RG" \
+        --query properties.customDomainVerificationId \
+        -o tsv)
+    if [[ -z "$ASUID_VALUE" ]]; then
+        echo "Could not read Container App customDomainVerificationId (asuid value)."
+        return 1
+    fi
+
+    upsert_a_record() {
+        local record_name="$1"
+        local record_ip="$2"
+
+        az network dns record-set a create \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            --ttl 300 >/dev/null
+
+        az network dns record-set a update \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            --set aRecords=[] >/dev/null
+
+        az network dns record-set a add-record \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            -a "$record_ip" >/dev/null
+    }
+
+    upsert_txt_record() {
+        local record_name="$1"
+        local txt_value="$2"
+
+        az network dns record-set txt create \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            --ttl 300 >/dev/null
+
+        az network dns record-set txt update \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            --set txtRecords=[] >/dev/null
+
+        az network dns record-set txt add-record \
+            -g "$DNS_ZONE_RG" \
+            -z "$DNS_ZONE_NAME" \
+            -n "$record_name" \
+            --value "$txt_value" >/dev/null
+    }
+
+    echo "▶ Creating/updating @ and www A records in Azure DNS..."
+    upsert_a_record "@" "$ACA_IP"
+    upsert_a_record "www" "$ACA_IP"
+
+    echo "▶ Creating/updating asuid TXT record..."
+    upsert_txt_record "asuid" "$ASUID_VALUE"
+
+    echo "✅ DNS records configured"
 }
 
 host_aks() {
@@ -196,5 +302,6 @@ export -f envc
 export -f enva
 export -f deploy_aks
 export -f host_aks
-export -f docker
+export -f docker_build_push
 export -f deploy_aca
+export -f host_aca
