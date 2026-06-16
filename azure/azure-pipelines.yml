@@ -125,13 +125,11 @@ stages:
                     --resource-group "$RESOURCE_GROUP" \
                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)"
 
-                  mkdir -p .streamlit
-                  printf 'SUPABASE_URL = "%s"\nSUPABASE_KEY = "%s"\n' "$(SUPABASE_URL)" "$(SUPABASE_KEY)" > .streamlit/secrets.toml
-
                   az containerapp update \
                     --name "$APP_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
                     --image "$IMAGE" \
+                    --command "/bin/sh" "-c" 'mkdir -p .streamlit && echo "SUPABASE_URL = \"$SUPABASE_URL\"" > .streamlit/secrets.toml && echo "SUPABASE_KEY = \"$SUPABASE_KEY\"" >> .streamlit/secrets.toml && streamlit run ranking_app.py --server.port=8501 --server.address=0.0.0.0' \
                     --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
                 else
                   az containerapp create \
@@ -146,5 +144,6 @@ stages:
                     --min-replicas 0 \
                     --max-replicas 1 \
                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)" \
-                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key \
+                    --command "/bin/sh" "-c" 'mkdir -p .streamlit && echo "SUPABASE_URL = \"$SUPABASE_URL\"" > .streamlit/secrets.toml && echo "SUPABASE_KEY = \"$SUPABASE_KEY\"" >> .streamlit/secrets.toml && streamlit run ranking_app.py --server.port=8501 --server.address=0.0.0.0'
                 fi
