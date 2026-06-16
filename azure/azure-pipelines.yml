@@ -31,7 +31,7 @@ stages:
           $(tag)
 
     - publish: '$(Build.SourcesDirectory)'
-      artifact: manifests
+      artifact: linkedin-games-ranking
 
 - stage: Deploy
   displayName: Deploy to Azure Container Apps
@@ -49,7 +49,7 @@ stages:
         deploy:
           steps:
           - download: current
-            artifact: manifests
+            artifact: linkedin-games-ranking
 
           # AKS deployment steps kept as reference (disabled)
           # - script: |
