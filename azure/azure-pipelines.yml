@@ -104,14 +104,6 @@ stages:
           #     containers: |
           #       $(RegistryName)/$(linkedinGamesRankingRepository):$(tag)
 
-          - script: |
-              mkdir -p .streamlit
-              cat <<EOF > .streamlit/secrets.toml
-              SUPABASE_URL = "$(SUPABASE_URL)"
-              SUPABASE_KEY = "$(SUPABASE_KEY)"
-              EOF
-            displayName: Create secrets.toml
-
           - task: AzureCLI@2
             displayName: Deploy to Azure Container Apps
             inputs:
@@ -132,6 +124,12 @@ stages:
                     --name "$APP_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)"
+
+                  mkdir -p .streamlit
+                  cat <<EOF > .streamlit/secrets.toml
+                  SUPABASE_URL = "$(SUPABASE_URL)"
+                  SUPABASE_KEY = "$(SUPABASE_KEY)"
+                  EOF
 
                   az containerapp update \
                     --name "$APP_NAME" \
