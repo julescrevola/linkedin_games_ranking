@@ -119,11 +119,6 @@ stages:
                 TARGET_PORT="$(acaTargetPort)"
                 IMAGE="$(linkedinGamesRankingRepository):$(tag)"
 
-                # Inline script that runs inside the container at startup:
-                # reads SUPABASE_URL and SUPABASE_KEY from the container's env vars
-                # (injected by ACA from its secrets) and writes .streamlit/secrets.toml
-                CREATE_SECRETS_TOML='mkdir -p .streamlit && echo "SUPABASE_URL = \"$SUPABASE_URL\"" > .streamlit/secrets.toml && echo "SUPABASE_KEY = \"$SUPABASE_KEY\"" >> .streamlit/secrets.toml && streamlit run ranking_app.py --server.port=8501 --server.address=0.0.0.0'
-
                 if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
                   az containerapp secret set \
                     --name "$APP_NAME" \
@@ -134,8 +129,6 @@ stages:
                     --name "$APP_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
                     --image "$IMAGE" \
-                    --command "/bin/sh" \
-                    --args "-c" "$CREATE_SECRETS_TOML" \
                     --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
                 else
                   az containerapp create \
@@ -150,7 +143,5 @@ stages:
                     --min-replicas 0 \
                     --max-replicas 1 \
                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)" \
-                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key \
-                    --command "/bin/sh" \
-                    --args "-c" "$CREATE_SECRETS_TOML"
+                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
                 fi
