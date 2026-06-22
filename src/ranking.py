@@ -2,7 +2,7 @@ import pandas as pd
 import re
 import argparse
 
-from linkedin_games_parser import parse_whatsapp_chat
+from src.linkedin_games_parser import parse_whatsapp_chat
 
 # Path to input data
 INPUT = "data/input/_chat.txt"

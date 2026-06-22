@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client
-from linkedin_games_parser import parse_whatsapp_chat
+from src.linkedin_games_parser import parse_whatsapp_chat
 
 
 # Constants - Modify for your own ranking
