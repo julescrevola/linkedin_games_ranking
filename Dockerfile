@@ -1,4 +1,4 @@
-# Build the application in the `/app` directory
+# Build the application in the `/linkedin_games_ranking` directory
 FROM ghcr.io/astral-sh/uv:trixie-slim AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
