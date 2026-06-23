@@ -29,7 +29,7 @@ And so on.
 │       ├── components/     # DataTable, WinBar, WinOverTimeChart
 │       └── pages/          # LeaderboardPage, HeadToHeadPage
 ├── nginx/                  # Nginx reverse proxy + Let's Encrypt
-│   └── conf.d/             # app.conf (HTTPS), init-letsencrypt.conf
+│   └── conf.d/             # app.conf (HTTPS)
 ├── azure/                  # Azure DevOps pipeline
 ├── .github/workflows/      # GitHub Actions CI/CD
 ├── kubernetes/             # AKS deployment manifests
