@@ -12,6 +12,6 @@ spec:
     - dns01:
         azureDNS:
           subscriptionID: ${SUBSCRIPTION_ID}
-          resourceGroupName: ${AKS_RG}
+          resourceGroupName: ${RG}
           hostedZoneName: ${DNS_ZONE_NAME}
           environment: AzurePublicCloud
