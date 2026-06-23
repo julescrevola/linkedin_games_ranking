@@ -2,8 +2,11 @@ trigger:
 - 'main'
 
 variables:
-  linkedinGamesRankingRepository: 'julescrevola/linkedin-games'
-  tag: '$(Build.BuildId)'
+- group: release
+- name: linkedinGamesRankingRepository
+  value: 'julescrevola/linkedin-games'
+- name: tag
+  value: '$(Build.BuildId)'
 
 stages:
 - stage: Build
