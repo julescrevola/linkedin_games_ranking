@@ -50,7 +50,14 @@ stages:
           - script: |
               ssh $(SCALEWAY_USER)@$(SCALEWAY_HOST) bash -s <<'EOF'
                 set -e
-                cd ~/linkedin_games_ranking
+                # Clone/update repo
+                if [[ -d ~/linkedin_games_ranking ]]; then
+                    echo "▶ Pulling latest code..."
+                    cd ~/linkedin_games_ranking && git pull
+                else
+                    echo "▶ Cloning repository..."
+                    git clone https://github.com/julescrevola/linkedin_games_ranking.git ~/linkedin_games_ranking && cd ~/linkedin_games_ranking
+                fi
 
                 echo "Pulling latest image..."
                 docker pull julescrevola/linkedin-games:latest
