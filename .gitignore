@@ -22,3 +22,8 @@ __pycache__/linkedin_games_parser.cpython-312.pyc
 
 # Github Copilot
 .github/agents
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+static/

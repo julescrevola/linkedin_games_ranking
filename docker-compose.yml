@@ -1,0 +1,14 @@
+services:
+  api:
+    image: julescrevola/linkedin-games:latest
+    environment:
+      - PORT=8000
+    expose:
+      - "8000"
+    networks:
+      - linkedin_games_ranking
+    restart: unless-stopped
+
+networks:
+  linkedin_games_ranking:
+    external: true

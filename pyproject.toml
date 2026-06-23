@@ -1,13 +1,17 @@
 [project]
 name = "linkedin_games_ranking"
-version = "0.1.0"
+version = "0.2.0"
 description = "App to create custom rankings for LinkedIn games."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0.1",
     "pandas>=3.0.2",
+    "pyarrow>=17.0.0",
     "pre-commit>=4.6.0",
-    "streamlit>=1.57.0",
     "supabase>=2.29.0",
     "timedelta>=2020.12.3",
 ]

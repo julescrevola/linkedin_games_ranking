@@ -1,13 +1,7 @@
-[<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="50">](https://kubernetes.io/) [<img src="https://user-images.githubusercontent.com/7164864/217935870-c0bc60a3-6fc0-4047-b011-7b4c59488c91.png" alt="Streamlit logo" style="margin-top:50px"></img>](https://streamlit.io/)
-
-[![Supabase](https://supabase.com/badge-made-with-supabase-dark.svg)](https://supabase.com)
-
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-
 # LinkedIn Games Ranking
 
 Ranking friends' scores on LinkedIn games, taking as input the `_chat.txt` extract of the WhatsApp chat in which we share results.
-Find the Streamlit app [here](https://linkedin-games-ranking.com).
+Find the app [here](https://linkedin-games-ranking.com).
 
 Total scores are computed by awarding the following points, per game per day:
 - 5 points for the best player
@@ -21,6 +15,28 @@ The sum of points must always be 9, so draws are dealt with in the following way
 - If the ranking is 1-2-2-2, then the first player gets 5 and the next players get (3+1)/3 = 1.33 each
 
 And so on.
+
+## Project Structure
+
+```
+├── src/                    # Python backend (FastAPI)
+│   ├── api/                # API routes (leaderboard, head-to-head, upload)
+│   │   ├── routes/
+│   │   └── services/
+│   └── linkedin_games_parser.py  # WhatsApp chat parser
+├── frontend/               # React + Vite + TailwindCSS frontend
+│   └── src/
+│       ├── components/     # DataTable, WinBar, WinOverTimeChart
+│       └── pages/          # LeaderboardPage, HeadToHeadPage
+├── nginx/                  # Nginx reverse proxy + Let's Encrypt
+│   └── conf.d/             # app.conf (HTTPS), init-letsencrypt.conf
+├── azure/                  # Azure DevOps pipeline
+├── .github/workflows/      # GitHub Actions CI/CD
+├── kubernetes/             # AKS deployment manifests
+├── docker-compose.yml      # API container
+├── Dockerfile              # Python API image
+└── cli-aliases.sh          # All deployment & dev helper commands
+```
 
 ## Clone repo
 
@@ -58,34 +74,52 @@ To install pre-commit hooks, run:
 pre-commit install
 ```
 
-## Run the scripts
+## Run locally
 
-### Locally
-
-To run the scripts, you have 2 options:
-- If you wish, you can first run the parser script with (make sure that the input and output data paths are the right ones)
+Start the FastAPI backend:
 ```bash
-python linkedin_games_parser.py
+dev_api
 ```
-This way, you can see what the parsed data looks like.
 
-Then, you have 2 ways to run `ranking.py` and extract rankings:
-- Create leaderboards for each game for the whole chat history:
+In a separate terminal, start the React frontend:
 ```bash
-python ranking.py
+dev_frontend
 ```
-- Create leaderboards for each game for a specific day (**make sure to input the date in the format YYYY-MM-DD**):
-```bash
-python ranking.py --day <YYYY-MM-DD>
-```
-### As a Streamlit app
 
-Configure Supabase credentials by copying `.streamlit/secrets.example.toml` and renaming it to `.streamlit/secrets.toml`, then filling in `SUPABASE_URL` and `SUPABASE_KEY` (for AKS) and/or `supabase-url` and `supabase-key` (for ACA).
+The API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`.
 
-Run in your terminal:
+## Deploy to Scaleway VPS
+
+The app is currently deployed on a Scaleway instance with Docker, nginx as reverse proxy, and Let's Encrypt for SSL.
+
+### First-time server setup
+
 ```bash
-streamlit run ranking_app.py
+source cli-aliases.sh
+setup_scaleway
 ```
+
+This installs Docker on the server and clones the repo.
+
+### Deploy
+
+```bash
+deploy_scaleway
+```
+
+This builds and pushes the Docker image, then SSHes into the server to pull and restart containers.
+
+### Manual deployment on the server
+
+```bash
+docker_host
+```
+
+This runs directly on the server: creates the Docker network, starts the API, handles SSL cert issuance via certbot, and starts nginx.
+
+### DNS Setup
+
+Point your domain's A record to the Scaleway instance's public IP. The certbot step in `docker_host` will obtain the SSL certificate automatically.
 
 ## Deploy to your own Kubernetes cluster or Azure Container App
 
@@ -106,7 +140,7 @@ These commands build and push the Docker image, then create or update the target
 
 You can then go to the URL displayed in the terminal when the deployment is done and you will see your app.
 
-## Connect to your domain
+### Connect to your domain
 
 If you have bought a domain name (I got mine on [GoDaddy](https://www.godaddy.com/)), you can connect to it so that you use HTTPS instead of HTTP.
 
@@ -132,5 +166,13 @@ Make sure helpers are loaded with `source cli-aliases.sh`, then run:
 For reference, I helped myself with these for AKS:
 - https://dev.to/aadarsh-nagrath/setting-up-https-on-kubernetes-with-cert-manager-and-lets-encrypt-45e6
 - https://dev.to/peterj/expose-a-kubernetes-service-on-your-own-custom-domain-52dd
+
+
+## CI/CD
+
+Both pipelines trigger on push to `main`: build Docker image → push to Docker Hub → deploy to Scaleway/AKS/ACA.
+
+- **GitHub Actions**: `.github/workflows/ci-cd.yml`
+- **Azure DevOps**: `azure/azure-pipelines.yml`
 
 **You are ready to create your own ranking!**
