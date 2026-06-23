@@ -69,8 +69,26 @@ stages:
                 echo "Restarting API container..."
                 docker compose -f docker-compose.yml up -d --pull always
 
-                echo "Restarting nginx..."
+                echo "Starting nginx (auto-generates dummy cert if needed)..."
                 docker compose -f nginx/docker-compose.yml up -d
+
+                DOMAIN=$(grep -oP '(?<=server_name )[\w.-]+' nginx/conf.d/app.conf | head -1)
+                CERT_FILE="nginx/ssl/live/$DOMAIN/fullchain.pem"
+
+                if [[ -f "$CERT_FILE" ]] && \
+                   ! openssl x509 -in "$CERT_FILE" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+                    echo "✅ Valid SSL certificate found."
+                else
+                    echo "Requesting SSL certificate for $DOMAIN..."
+                    sleep 3
+                    docker compose -f nginx/docker-compose.yml run --rm certbot certonly \
+                        --webroot -w /var/www/certbot \
+                        -d "$DOMAIN" \
+                        --agree-tos \
+                        -m "admin@$DOMAIN" \
+                        --non-interactive || echo "⚠️ Cert issuance failed (DNS may not be ready)"
+                    docker compose -f nginx/docker-compose.yml restart nginx
+                fi
 
                 echo "✅ Deployment complete"
               EOF

@@ -70,26 +70,16 @@ docker_host() {
     echo "Starting container..."
     docker-compose -f docker-compose.yml up -d
 
-    # Check if SSL certs already exist
-    if [[ -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]]; then
-        echo "SSL certificates found. Starting nginx with HTTPS..."
-        docker-compose -f nginx/docker-compose.yml up -d
-    else
-        echo "No SSL certificates found. Issuing via Let's Encrypt..."
+    # Start nginx (auto-generates dummy cert if real one doesn't exist)
+    echo "Starting nginx..."
+    docker-compose -f nginx/docker-compose.yml up -d
 
-        # Temporarily use init config for cert issuance
-        cp nginx/conf.d/app.conf nginx/conf.d/app.conf.bak
-        cp nginx/conf.d/init-letsencrypt.conf nginx/conf.d/app.conf
-
-        # Start nginx with HTTP-only config
-        docker-compose -f nginx/docker-compose.yml up -d nginx
-
-        # Wait for nginx to be ready
-        echo "Waiting for nginx to start..."
+    # Issue real SSL cert if not already present
+    if [[ ! -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]] || \
+       openssl x509 -in "nginx/ssl/live/$DOMAIN/fullchain.pem" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+        echo "Requesting SSL certificate for $DOMAIN..."
         sleep 3
 
-        # Request certificate
-        echo "Requesting SSL certificate for $DOMAIN..."
         docker-compose -f nginx/docker-compose.yml run --rm certbot certonly \
             --webroot -w /var/www/certbot \
             -d "$DOMAIN" \
@@ -101,19 +91,14 @@ docker_host() {
             echo "❌ Certificate issuance failed. Check that:"
             echo "   - DNS A record for $DOMAIN points to this server's public IP"
             echo "   - Port 80 is open in the firewall"
-            # Restore original config
-            cp nginx/conf.d/app.conf.bak nginx/conf.d/app.conf
-            rm -f nginx/conf.d/app.conf.bak
             return 1
         fi
 
-        # Restore HTTPS config
-        cp nginx/conf.d/app.conf.bak nginx/conf.d/app.conf
-        rm -f nginx/conf.d/app.conf.bak
-
-        # Restart nginx with full HTTPS config
+        # Restart nginx to pick up real cert
         docker-compose -f nginx/docker-compose.yml restart nginx
         echo "✅ SSL certificate issued successfully."
+    else
+        echo "✅ Valid SSL certificate found."
     fi
 
     echo "✅ Deployment complete. Access the application at https://$DOMAIN"
@@ -147,29 +132,25 @@ deploy_scaleway() {
         echo "▶ Restarting API container..."
         docker compose -f docker-compose.yml up -d
 
+        echo "▶ Starting nginx (auto-generates dummy cert if needed)..."
+        docker compose -f nginx/docker-compose.yml up -d
+
         echo "▶ Checking SSL certificates..."
         DOMAIN=$(grep -oP '(?<=server_name )[\w.-]+' nginx/conf.d/app.conf | head -1)
 
-        if [[ -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]]; then
-            echo "▶ Certs exist. Restarting nginx..."
-            docker compose -f nginx/docker-compose.yml up -d
+        if [[ -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]] && \
+           ! openssl x509 -in "nginx/ssl/live/$DOMAIN/fullchain.pem" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+            echo "✅ Valid SSL certificate found."
         else
-            echo "▶ No certs found. Issuing via Let's Encrypt..."
-            cp nginx/conf.d/app.conf nginx/conf.d/app.conf.bak
-            cp nginx/conf.d/init-letsencrypt.conf nginx/conf.d/app.conf
-            docker compose -f nginx/docker-compose.yml up -d nginx
+            echo "▶ Requesting real SSL certificate..."
             sleep 3
-
-            EMAIL=$(grep -oP '(?<=your-email@).*' nginx/conf.d/init-letsencrypt.conf || echo "")
             docker compose -f nginx/docker-compose.yml run --rm certbot certonly \
                 --webroot -w /var/www/certbot \
                 -d "$DOMAIN" \
                 --agree-tos \
-                -m "${EMAIL:-admin@$DOMAIN}" \
+                -m "admin@$DOMAIN" \
                 --non-interactive
 
-            cp nginx/conf.d/app.conf.bak nginx/conf.d/app.conf
-            rm -f nginx/conf.d/app.conf.bak
             docker compose -f nginx/docker-compose.yml restart nginx
         fi
 
