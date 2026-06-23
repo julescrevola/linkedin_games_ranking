@@ -54,6 +54,53 @@ docker_build_push() {
     docker push julescrevola/linkedin-games:latest
 }
 
+scaleway_ssh_target() {
+    printf '%s@%s' "$SCALEWAY_USER" "$SCALEWAY_HOST"
+}
+
+scaleway_ssh() {
+    local ssh_cmd=(
+        ssh
+        -i "$SSH_KEY_FILE"
+        -o BatchMode=yes
+        -o ConnectTimeout=10
+        -o ServerAliveInterval=15
+        -o ServerAliveCountMax=3
+        -o StrictHostKeyChecking=accept-new
+    )
+
+    if [[ "$SSH_DEBUG" == "1" ]]; then
+        ssh_cmd+=(-v)
+    fi
+
+    ssh_cmd+=("$(scaleway_ssh_target)" "$@")
+    "${ssh_cmd[@]}"
+}
+
+scaleway_ssh_preflight() {
+    if [[ -z "$SCALEWAY_HOST" || -z "$SCALEWAY_USER" || -z "$SSH_KEY_FILE" ]]; then
+        echo "❌ Missing Scaleway SSH configuration. Check SCALEWAY_HOST, SCALEWAY_USER, and SSH_KEY_FILE in .env"
+        return 1
+    fi
+
+    if [[ ! -f "$SSH_KEY_FILE" ]]; then
+        echo "❌ SSH key file not found: $SSH_KEY_FILE"
+        return 1
+    fi
+
+    echo "▶ Checking SSH connectivity to $(scaleway_ssh_target)..."
+    if ! scaleway_ssh "echo connected to \$(hostname)"; then
+        local exit_code=$?
+        echo "❌ SSH connection failed (exit $exit_code)."
+        echo "   - Verify SSH_KEY_FILE points to the correct private key"
+        echo "   - Verify $SCALEWAY_HOST is reachable and accepts SSH on port 22"
+        echo "   - If the server host key changed, remove the stale entry from ~/.ssh/known_hosts"
+        echo "   - Manual check: ssh -i \"$SSH_KEY_FILE\" \"$(scaleway_ssh_target)\""
+        echo "   - Verbose check: SSH_DEBUG=1 deploy_scaleway"
+        return $exit_code
+    fi
+}
+
 docker_host() {
     docker_build_push
     echo "Deploying Docker container with custom domain $DOMAIN..."
@@ -112,7 +159,8 @@ deploy_scaleway() {
     docker_build_push
 
     echo "▶ Deploying to Scaleway server ($SCALEWAY_HOST)..."
-    ssh -i $SSH_KEY_FILE "$SCALEWAY_USER@$SCALEWAY_HOST" bash -s <<'REMOTE_SCRIPT'
+    scaleway_ssh_preflight || return $?
+    scaleway_ssh bash -s <<'REMOTE_SCRIPT'
         set -e
         cd ~/linkedin_games_ranking
 
@@ -161,7 +209,8 @@ REMOTE_SCRIPT
 # First-time Scaleway server setup (run once after creating the instance)
 setup_scaleway() {
     echo "▶ Setting up Scaleway server ($SCALEWAY_HOST)..."
-    ssh -i $SSH_KEY_FILE "$SCALEWAY_USER@$SCALEWAY_HOST" bash -s <<'REMOTE_SCRIPT'
+    scaleway_ssh_preflight || return $?
+    scaleway_ssh bash -s <<'REMOTE_SCRIPT'
         set -e
 
         # Install Docker if not present
