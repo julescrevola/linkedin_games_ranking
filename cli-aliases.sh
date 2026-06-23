@@ -124,7 +124,7 @@ docker_host() {
 }
 
 deploy_scaleway() {
-    # docker_build_push
+    docker_build_push
 
     echo "▶ Deploying to Scaleway server ($SCALEWAY_HOST)..."
     ssh -i $SSH_KEY_FILE "$SCALEWAY_USER@$SCALEWAY_HOST" bash -s <<'REMOTE_SCRIPT'
