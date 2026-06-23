@@ -107,12 +107,16 @@ jobs:
             else
                 echo "Requesting SSL certificate for $DOMAIN..."
                 sleep 3
+                if [[ -f "$CERT_FILE" ]] && \
+                   openssl x509 -in "$CERT_FILE" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+                    rm -rf "nginx/ssl/live/$DOMAIN" "nginx/ssl/archive/$DOMAIN" "nginx/ssl/renewal/$DOMAIN.conf"
+                fi
                 docker compose -f nginx/docker-compose.yml run --rm certbot certonly \
                     --webroot -w /var/www/certbot \
                     -d "$DOMAIN" \
                     --agree-tos \
                     -m "admin@$DOMAIN" \
-                    --non-interactive || echo "⚠️ Cert issuance failed (DNS may not be ready)"
+                    --non-interactive
                 docker compose -f nginx/docker-compose.yml restart nginx
             fi
 

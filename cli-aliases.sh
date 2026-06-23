@@ -127,6 +127,11 @@ docker_host() {
         echo "Requesting SSL certificate for $DOMAIN..."
         sleep 3
 
+        if [[ -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]] && \
+           openssl x509 -in "nginx/ssl/live/$DOMAIN/fullchain.pem" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+            rm -rf "nginx/ssl/live/$DOMAIN" "nginx/ssl/archive/$DOMAIN" "nginx/ssl/renewal/$DOMAIN.conf"
+        fi
+
         docker-compose -f nginx/docker-compose.yml run --rm certbot certonly \
             --webroot -w /var/www/certbot \
             -d "$DOMAIN" \
@@ -192,6 +197,10 @@ deploy_scaleway() {
         else
             echo "▶ Requesting real SSL certificate..."
             sleep 3
+            if [[ -f "nginx/ssl/live/$DOMAIN/fullchain.pem" ]] && \
+               openssl x509 -in "nginx/ssl/live/$DOMAIN/fullchain.pem" -subject -noout 2>/dev/null | grep -q "CN=localhost"; then
+                rm -rf "nginx/ssl/live/$DOMAIN" "nginx/ssl/archive/$DOMAIN" "nginx/ssl/renewal/$DOMAIN.conf"
+            fi
             docker compose -f nginx/docker-compose.yml run --rm certbot certonly \
                 --webroot -w /var/www/certbot \
                 -d "$DOMAIN" \
