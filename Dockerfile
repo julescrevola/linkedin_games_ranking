@@ -27,6 +27,14 @@ COPY . /linkedin_games_ranking
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
+# Build frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
 # Use a final image without uv
 FROM debian:trixie-slim
 
@@ -35,6 +43,9 @@ COPY --from=builder /python /python
 
 # Copy the application from the builder
 COPY --from=builder --chown=nonroot:nonroot /linkedin_games_ranking /linkedin_games_ranking
+
+# Copy built frontend to static directory
+COPY --from=frontend-builder /app/dist /linkedin_games_ranking/static
 
 # Place executables in the environment at the front of the path
 ENV PATH="/linkedin_games_ranking/.venv/bin:$PATH"
@@ -46,8 +57,8 @@ ENV PYTHONUNBUFFERED=1
 # Use `/linkedin_games_ranking` as the working directory
 WORKDIR /linkedin_games_ranking
 
-# Expose the port Streamlit runs on
-EXPOSE 8501
+# Expose the port FastAPI runs on
+EXPOSE 8000
 
-# Generate Streamlit secrets from env vars at container startup, then run the app
-CMD ["/bin/bash", "-c", "mkdir -p .streamlit && printf 'SUPABASE_URL = \"%s\"\\nSUPABASE_KEY = \"%s\"\\n' \"$SUPABASE_URL\" \"$SUPABASE_KEY\" > .streamlit/secrets.toml && streamlit run src/ranking_app.py --server.port=8501 --server.address=0.0.0.0"]
+# Start the FastAPI application with Uvicorn
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
