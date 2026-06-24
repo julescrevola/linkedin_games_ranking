@@ -28,12 +28,9 @@ And so on.
 │   └── src/
 │       ├── components/     # DataTable, WinBar, WinOverTimeChart
 │       └── pages/          # LeaderboardPage, HeadToHeadPage
-├── nginx/                  # Nginx reverse proxy + Let's Encrypt
-│   └── conf.d/             # app.conf (HTTPS)
 ├── azure/                  # Azure DevOps pipeline
 ├── .github/workflows/      # GitHub Actions CI/CD
 ├── kubernetes/             # AKS deployment manifests
-├── docker-compose.yml      # API container
 ├── Dockerfile              # Python API image
 └── cli-aliases.sh          # All deployment & dev helper commands
 ```
@@ -88,39 +85,6 @@ dev_frontend
 
 The API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`.
 
-## Deploy to Scaleway VPS
-
-The app is currently deployed on a Scaleway instance with Docker, nginx as reverse proxy, and Let's Encrypt for SSL.
-
-### First-time server setup
-
-```bash
-source cli-aliases.sh
-setup_scaleway
-```
-
-This installs Docker on the server and clones the repo.
-
-### Deploy
-
-```bash
-deploy_scaleway
-```
-
-This builds and pushes the Docker image, then SSHes into the server to pull and restart containers.
-
-### Manual deployment on the server
-
-```bash
-docker_host
-```
-
-This runs directly on the server: creates the Docker network, starts the API, handles SSL cert issuance via certbot, and starts nginx.
-
-### DNS Setup
-
-Point your domain's A record to the Scaleway instance's public IP. The certbot step in `docker_host` will obtain the SSL certificate automatically.
-
 ## Deploy to your own Kubernetes cluster or Azure Container App
 
 **This repo is using an [Azure Container App](https://learn.microsoft.com/fr-fr/azure/container-apps/) or a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
@@ -150,7 +114,7 @@ First, provision an Azure DNS Zone with:
 ```bash
 az network dns zone create --resource-group $DNS_ZONE_RG --name $DNS_ZONE_NAME
 ```
-Then, go to your domain provider, and in Name Servers, add the following 4 URLs (remove all the others):
+Then, go to your domain provider, and in Name Servers, add the 4 URLs that look like the following (remove all the others):
 ```txt
 ns1-01.azure-dns.com
 ns2-01.azure-dns.net
