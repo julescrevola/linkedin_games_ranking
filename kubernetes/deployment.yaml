@@ -22,7 +22,7 @@ spec:
           mountPath: /linkedin_games_ranking/.streamlit
           readOnly: true
         ports:
-        - containerPort: 8501
+        - containerPort: 8000
       volumes:
       - name: streamlit-secrets
         secret:
