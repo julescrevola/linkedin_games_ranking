@@ -2,7 +2,7 @@ trigger:
 - 'main'
 
 variables:
-- group: release
+- group: Release
 - name: linkedinGamesRankingRepository
   value: 'julescrevola/linkedin-games'
 - name: tag
