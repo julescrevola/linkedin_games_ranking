@@ -127,6 +127,8 @@ Make sure helpers are loaded with `source cli-aliases.sh`, then run:
 - `host_aks` for AKS
 - `host_aca` for ACA
 
+For ACA, you then need to go the Custom domains section in Networking --> Add custom domain --> Managed certificate --> Enter your domain name --> Validate. It can take up to 10 minutes for the SSL certificate to be issued, and your will be accessible after that.
+
 For reference, I helped myself with these for AKS:
 - https://dev.to/aadarsh-nagrath/setting-up-https-on-kubernetes-with-cert-manager-and-lets-encrypt-45e6
 - https://dev.to/peterj/expose-a-kubernetes-service-on-your-own-custom-domain-52dd
