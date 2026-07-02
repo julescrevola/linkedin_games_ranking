@@ -372,6 +372,8 @@ def compute_rankings(
                 .reset_index(drop=True)
                 .rename(columns={"score": "Total Score"})
             )
+            col_total_score = merged_final.pop("Total Score")
+            merged_final.insert(1, "Total Score", col_total_score)
             per_game_rankings[game] = _sanitize(merged_final)
         else:
             merged_final = (
@@ -380,6 +382,8 @@ def compute_rankings(
                 .reset_index(drop=True)
                 .rename(columns={"score": "Score"})
             )
+            col_score = merged_final.pop("Score")
+            merged_final.insert(1, "Score", col_score)
             per_game_rankings[game] = _sanitize(merged_final)
 
         # Overall best sum
