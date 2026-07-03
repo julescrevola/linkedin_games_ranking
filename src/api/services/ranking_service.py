@@ -378,7 +378,7 @@ def compute_rankings(
         else:
             merged_final = (
                 merged[["Player", "Time", "CEO %", "N°1", "score"]]
-                .sort_values(by="score", ascending=True)
+                .sort_values(by="score", ascending=False)
                 .reset_index(drop=True)
                 .rename(columns={"score": "Score"})
             )
