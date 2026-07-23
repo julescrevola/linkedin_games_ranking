@@ -90,8 +90,11 @@ The API runs on `http://localhost:8000` and the frontend on `http://localhost:51
 **This repo supports [Azure Container Apps](https://learn.microsoft.com/fr-fr/azure/container-apps/), [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), and [Azure App Service (Web Apps)](https://learn.microsoft.com/en-us/azure/app-service/), feel free to provision infrastructure with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
-Provision ACA, AKS, or an App Service in Azure, either manually in the Azure Portal or with Azure CLI.
 
+Login to the Azure CLI with:
+```bash
+az login --use-device-code
+```
 Load helpers and env variables with:
 ```bash
 source cli-aliases.sh
