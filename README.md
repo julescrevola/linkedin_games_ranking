@@ -85,12 +85,12 @@ dev_frontend
 
 The API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`.
 
-## Deploy to your own Kubernetes cluster or Azure Container App
+## Deploy to your own Kubernetes cluster, Azure Container App, or Azure Web App
 
-**This repo is using an [Azure Container App](https://learn.microsoft.com/fr-fr/azure/container-apps/) or a Kubernetes cluster deployed in Azure with [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), feel free to provision a cluster with another method and change the code accordingly for your usage.**
+**This repo supports [Azure Container Apps](https://learn.microsoft.com/fr-fr/azure/container-apps/), [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), and [Azure App Service (Web Apps)](https://learn.microsoft.com/en-us/azure/app-service/), feel free to provision infrastructure with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
-Provision ACA or AKS in Azure, either manually in the Azure Portal or with Azure CLI.
+Provision ACA, AKS, or an App Service in Azure, either manually in the Azure Portal or with Azure CLI.
 
 Load helpers with:
 ```bash
@@ -99,6 +99,7 @@ source cli-aliases.sh
 Make sure Docker is running, then run:
 - `deploy_aca` for Azure Container Apps
 - `deploy_aks` for AKS
+- `deploy_webapp` for Azure App Service (Web App)
 
 These commands build and push the Docker image, then create or update the target deployment.
 
@@ -136,9 +137,9 @@ For reference, I helped myself with these for AKS:
 
 ## CI/CD
 
-Both pipelines trigger on push to `main`: build Docker image → push to Docker Hub → deploy to Scaleway/AKS/ACA.
+Both pipelines trigger on push to `main`: build Docker image → push to Docker Hub → deploy to Scaleway/AKS/ACA/Web App.
 
 - **GitHub Actions**: `.github/workflows/ci-cd.yml`
-- **Azure DevOps**: `azure/azure-pipelines.yml`
+- **Azure DevOps**: `azure/azure-pipelines.yml` — includes separate stages for ACA and Azure Web App (both triggered on push to `main`). Set the `WEBAPP_NAME` pipeline variable (and add it to the `Release` variable group alongside `SUPABASE_URL`, `SUPABASE_KEY`, `DOCKERHUB_USERNAME`, `DOCKERHUB_PASSWORD`) to enable the Web App stage.
 
 **You are ready to create your own ranking!**
