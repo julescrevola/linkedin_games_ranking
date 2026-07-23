@@ -7,6 +7,7 @@ variables:
   tag: '$(Build.BuildId)'
   imagePullSecret: 'secret'
   acaAppName: $(ACA_NAME)
+  webAppName: $(WEBAPP_NAME)
   ResourceGroup: $(RG)
   acaEnvironment: $(ACA_ENV_NAME)
   acaTargetPort: '8000'
@@ -34,65 +35,65 @@ stages:
       artifact: linkedin-games-ranking
 
 
-- stage: Deploy
-  displayName: Deploy to Azure Container App
-  dependsOn: Build
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy to ACA
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'linkedin_games_ranking'
-    variables:
-      - group: Release
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: linkedin-games-ranking
+# - stage: Deploy
+#   displayName: Deploy to Azure Container App
+#   dependsOn: Build
+#   jobs:
+#   - deployment: Deploy
+#     displayName: Deploy to ACA
+#     pool:
+#       vmImage: 'ubuntu-latest'
+#     environment: 'linkedin_games_ranking'
+#     variables:
+#       - group: Release
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: linkedin-games-ranking
 
-          - task: AzureCLI@2
-            displayName: Deploy to Azure Container App
-            inputs:
-              azureSubscription: service-connection-linkedin-games-ranking
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                az extension add --name containerapp --upgrade
+#           - task: AzureCLI@2
+#             displayName: Deploy to Azure Container App
+#             inputs:
+#               azureSubscription: service-connection-linkedin-games-ranking
+#               scriptType: bash
+#               scriptLocation: inlineScript
+#               inlineScript: |
+#                 az extension add --name containerapp --upgrade
 
-                APP_NAME="$(acaAppName)"
-                RESOURCE_GROUP="$(ResourceGroup)"
-                ENVIRONMENT_NAME="$(acaEnvironment)"
-                TARGET_PORT="$(acaTargetPort)"
-                IMAGE="$(linkedinGamesRankingRepository):$(tag)"
+#                 APP_NAME="$(acaAppName)"
+#                 RESOURCE_GROUP="$(ResourceGroup)"
+#                 ENVIRONMENT_NAME="$(acaEnvironment)"
+#                 TARGET_PORT="$(acaTargetPort)"
+#                 IMAGE="$(linkedinGamesRankingRepository):$(tag)"
 
-                if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
-                  az containerapp secret set \
-                    --name "$APP_NAME" \
-                    --resource-group "$RESOURCE_GROUP" \
-                    --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)"
+#                 if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+#                   az containerapp secret set \
+#                     --name "$APP_NAME" \
+#                     --resource-group "$RESOURCE_GROUP" \
+#                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)"
 
-                  az containerapp update \
-                    --name "$APP_NAME" \
-                    --resource-group "$RESOURCE_GROUP" \
-                    --image "$IMAGE" \
-                    --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
-                else
-                  az containerapp create \
-                    --name "$APP_NAME" \
-                    --resource-group "$RESOURCE_GROUP" \
-                    --environment "$ENVIRONMENT_NAME" \
-                    --image "$IMAGE" \
-                    --ingress external \
-                    --target-port "$TARGET_PORT" \
-                    --cpu 0.5 \
-                    --memory 1.0Gi \
-                    --min-replicas 0 \
-                    --max-replicas 1 \
-                    --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)" \
-                    --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
-                fi
+#                   az containerapp update \
+#                     --name "$APP_NAME" \
+#                     --resource-group "$RESOURCE_GROUP" \
+#                     --image "$IMAGE" \
+#                     --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+#                 else
+#                   az containerapp create \
+#                     --name "$APP_NAME" \
+#                     --resource-group "$RESOURCE_GROUP" \
+#                     --environment "$ENVIRONMENT_NAME" \
+#                     --image "$IMAGE" \
+#                     --ingress external \
+#                     --target-port "$TARGET_PORT" \
+#                     --cpu 0.5 \
+#                     --memory 1.0Gi \
+#                     --min-replicas 0 \
+#                     --max-replicas 1 \
+#                     --secrets supabase-url="$(SUPABASE_URL)" supabase-key="$(SUPABASE_KEY)" \
+#                     --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+#                 fi
 
           # --- AKS deployment (disabled) ---
           #
@@ -139,3 +140,75 @@ stages:
           #       $(imagePullSecret)
           #     containers: |
           #       $(RegistryName)/$(linkedinGamesRankingRepository):$(tag)
+
+- stage: Deploy
+  displayName: Deploy to Azure Web App
+  dependsOn: Build
+  jobs:
+  - deployment: DeployWebApp
+    displayName: Deploy to Azure Web App (container)
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'linkedin_games_ranking_webapp'
+    variables:
+      - group: Release
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: linkedin-games-ranking
+
+          - task: AzureCLI@2
+            displayName: Deploy container to Azure Web App
+            inputs:
+              azureSubscription: service-connection-linkedin-games-ranking
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                WEBAPP_NAME="$(webAppName)"
+                RESOURCE_GROUP="$(ResourceGroup)"
+                IMAGE="$(linkedinGamesRankingRepository):$(tag)"
+
+                if az webapp show --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+                  az webapp config appsettings set \
+                    --name "$WEBAPP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --settings \
+                      SUPABASE_URL="$SUPABASE_URL" \
+                      SUPABASE_KEY="$SUPABASE_KEY" \
+                      WEBSITES_PORT=8000
+
+                  az webapp config container set \
+                    --name "$WEBAPP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --container-image-name "$IMAGE" \
+                    --container-registry-url "https://index.docker.io" \
+                    --container-registry-user "$(DOCKERHUB_USERNAME)" \
+                    --container-registry-password "$(DOCKERHUB_PASSWORD)"
+
+                  az webapp restart --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP"
+                else
+                  az appservice plan create \
+                    --name "${WEBAPP_NAME}-plan" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --sku B1 \
+                    --is-linux
+
+                  az webapp create \
+                    --name "$WEBAPP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --plan "${WEBAPP_NAME}-plan" \
+                    --deployment-container-image-name "$IMAGE"
+
+                  az webapp config appsettings set \
+                    --name "$WEBAPP_NAME" \
+                    --resource-group "$RESOURCE_GROUP" \
+                    --settings \
+                      SUPABASE_URL="$SUPABASE_URL" \
+                      SUPABASE_KEY="$SUPABASE_KEY" \
+                      WEBSITES_PORT=8000 \
+                      DOCKER_REGISTRY_SERVER_URL="https://index.docker.io" \
+                      DOCKER_REGISTRY_SERVER_USERNAME="$(DOCKERHUB_USERNAME)" \
+                      DOCKER_REGISTRY_SERVER_PASSWORD="$(DOCKERHUB_PASSWORD)"
+                fi

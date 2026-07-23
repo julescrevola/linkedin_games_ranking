@@ -40,10 +40,106 @@ jobs:
         run: |
           python -m compileall .
 
-  deploy:
+  # deploy_containerapp:
+  #   permissions:
+  #     id-token: write
+  #   name: Deploy to Azure Container App
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+
+  #     - name: Log in to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+  #     - name: Build and push Docker image
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         context: .
+  #         file: Dockerfile
+  #         push: true
+  #         tags: |
+  #           ${{ env.IMAGE_NAME }}:latest
+  #           ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+  #         platforms: linux/amd64
+
+  #     - name: Log in to Azure
+  #       uses: azure/login@v3
+  #       with:
+  #         client-id: ${{ secrets.AZURE_CLIENT_ID }}
+  #         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+  #         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+  #     - name: Install Azure Container App extension
+  #       run: |
+  #         az extension add --name containerapp --upgrade
+
+  #     - name: Deploy to Azure Container App
+  #       run: |
+  #         APP_NAME="${{ secrets.ACA_NAME }}"
+  #         RESOURCE_GROUP="${{ secrets.RG }}"
+  #         IMAGE="${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+
+  #         if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+  #           az containerapp secret set \
+  #             --name "$APP_NAME" \
+  #             --resource-group "$RESOURCE_GROUP" \
+  #             --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}'
+
+  #           az containerapp update \
+  #             --name "$APP_NAME" \
+  #             --resource-group "$RESOURCE_GROUP" \
+  #             --image "$IMAGE" \
+  #             --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+  #         else
+  #           az containerapp create \
+  #             --name "$APP_NAME" \
+  #             --resource-group "$RESOURCE_GROUP" \
+  #             --environment '${{ secrets.ACA_ENV_NAME }}' \
+  #             --image "$IMAGE" \
+  #             --ingress external \
+  #             --target-port 8000 \
+  #             --cpu 0.5 \
+  #             --memory 1.0Gi \
+  #             --min-replicas 0 \
+  #             --max-replicas 1 \
+  #             --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}' \
+  #             --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+  #         fi
+
+      # --- AKS deployment (disabled) ---
+      # - name: Configure AKS credentials
+      #   run: |
+      #     az aks get-credentials --resource-group ${{ secrets.RG }} --name ${{ secrets.AKS_NAME }} --overwrite-existing
+      #
+      # - name: Create Kubernetes secret
+      #   run: |
+      #     kubectl create secret generic supabase-secrets \
+      #       --from-literal=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+      #       --from-literal=SUPABASE_KEY=${{ secrets.SUPABASE_KEY }} \
+      #       --dry-run=client -o yaml | kubectl apply -f -
+      #
+      # - name: Apply Kubernetes deployment
+      #   run: |
+      #     kubectl apply -f deployment.yaml
+      #     kubectl set image deployment/linkedin-games-ranking linkedin-games-ranking=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --record
+      #
+      # - name: Wait for rollout
+      #   run: |
+      #     kubectl rollout status deployment/linkedin-games-ranking --timeout=3m
+
+  deploy_webapp:
     permissions:
       id-token: write
-    name: Deploy to Azure Container App
+    name: Deploy to Azure Web App
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -78,60 +174,51 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install Azure Container App extension
+      - name: Deploy to Azure Web App
         run: |
-          az extension add --name containerapp --upgrade
-
-      - name: Deploy to Azure Container App
-        run: |
-          APP_NAME="${{ secrets.ACA_NAME }}"
+          WEBAPP_NAME="${{ secrets.WEBAPP_NAME }}"
           RESOURCE_GROUP="${{ secrets.RG }}"
           IMAGE="${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
-          if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
-            az containerapp secret set \
-              --name "$APP_NAME" \
+          if az webapp show --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP" >/dev/null 2>&1; then
+            az webapp config appsettings set \
+              --name "$WEBAPP_NAME" \
               --resource-group "$RESOURCE_GROUP" \
-              --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}'
+              --settings \
+                SUPABASE_URL='${{ secrets.SUPABASE_URL }}' \
+                SUPABASE_KEY='${{ secrets.SUPABASE_KEY }}' \
+                WEBSITES_PORT=8000
 
-            az containerapp update \
-              --name "$APP_NAME" \
+            az webapp config container set \
+              --name "$WEBAPP_NAME" \
               --resource-group "$RESOURCE_GROUP" \
-              --image "$IMAGE" \
-              --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
+              --container-image-name "$IMAGE" \
+              --container-registry-url "https://index.docker.io" \
+              --container-registry-user "${{ secrets.DOCKERHUB_USERNAME }}" \
+              --container-registry-password "${{ secrets.DOCKERHUB_PASSWORD }}"
+
+            az webapp restart --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP"
           else
-            az containerapp create \
-              --name "$APP_NAME" \
+            az appservice plan create \
+              --name "${WEBAPP_NAME}-plan" \
               --resource-group "$RESOURCE_GROUP" \
-              --environment '${{ secrets.ACA_ENV_NAME }}' \
-              --image "$IMAGE" \
-              --ingress external \
-              --target-port 8000 \
-              --cpu 0.5 \
-              --memory 1.0Gi \
-              --min-replicas 0 \
-              --max-replicas 1 \
-              --secrets supabase-url='${{ secrets.SUPABASE_URL }}' supabase-key='${{ secrets.SUPABASE_KEY }}' \
-              --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
-          fi
+              --sku B1 \
+              --is-linux
 
-      # --- AKS deployment (disabled) ---
-      # - name: Configure AKS credentials
-      #   run: |
-      #     az aks get-credentials --resource-group ${{ secrets.RG }} --name ${{ secrets.AKS_NAME }} --overwrite-existing
-      #
-      # - name: Create Kubernetes secret
-      #   run: |
-      #     kubectl create secret generic supabase-secrets \
-      #       --from-literal=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-      #       --from-literal=SUPABASE_KEY=${{ secrets.SUPABASE_KEY }} \
-      #       --dry-run=client -o yaml | kubectl apply -f -
-      #
-      # - name: Apply Kubernetes deployment
-      #   run: |
-      #     kubectl apply -f deployment.yaml
-      #     kubectl set image deployment/linkedin-games-ranking linkedin-games-ranking=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --record
-      #
-      # - name: Wait for rollout
-      #   run: |
-      #     kubectl rollout status deployment/linkedin-games-ranking --timeout=3m
+            az webapp create \
+              --name "$WEBAPP_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --plan "${WEBAPP_NAME}-plan" \
+              --deployment-container-image-name "$IMAGE"
+
+            az webapp config appsettings set \
+              --name "$WEBAPP_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --settings \
+                SUPABASE_URL='${{ secrets.SUPABASE_URL }}' \
+                SUPABASE_KEY='${{ secrets.SUPABASE_KEY }}' \
+                WEBSITES_PORT=8000 \
+                DOCKER_REGISTRY_SERVER_URL="https://index.docker.io" \
+                DOCKER_REGISTRY_SERVER_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}" \
+                DOCKER_REGISTRY_SERVER_PASSWORD="${{ secrets.DOCKERHUB_PASSWORD }}"
+          fi
