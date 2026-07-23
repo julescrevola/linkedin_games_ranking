@@ -183,7 +183,7 @@ stages:
                     --name "$WEBAPP_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
                     --container-image-name "$IMAGE" \
-                    --container-registry-url "https://index.docker.io" \
+                    --container-registry-url "https://index.docker.io"
 
                   az webapp restart --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP"
                 else
@@ -206,4 +206,5 @@ stages:
                       SUPABASE_URL="$SUPABASE_URL" \
                       SUPABASE_KEY="$SUPABASE_KEY" \
                       WEBSITES_PORT=8000 \
+                      DOCKER_REGISTRY_SERVER_URL="https://index.docker.io"
                 fi

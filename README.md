@@ -92,14 +92,15 @@ The API runs on `http://localhost:8000` and the frontend on `http://localhost:51
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
 Provision ACA, AKS, or an App Service in Azure, either manually in the Azure Portal or with Azure CLI.
 
-Load helpers with:
+Load helpers and env variables with:
 ```bash
 source cli-aliases.sh
+source .env
 ```
 Make sure Docker is running, then run:
 - `deploy_aca` for Azure Container Apps
 - `deploy_aks` for AKS
-- `deploy_webapp` for Azure App Service (Web App)
+- `deploy_webapp` for Azure Web App
 
 These commands build and push the Docker image, then create or update the target deployment.
 
@@ -127,8 +128,7 @@ This will ensure that DNS is dealt with by Azure directly.
 Make sure helpers are loaded with `source cli-aliases.sh`, then run:
 - `host_aks` for AKS
 - `host_aca` for ACA
-
-For ACA, you then need to go the Custom domains section in Networking --> Add custom domain --> Managed certificate --> Enter your domain name --> Validate. It can take up to 10 minutes for the SSL certificate to be issued, and your app will be accessible after that.
+- `host_webapp` for Azure Web App
 
 For reference, I helped myself with these for AKS:
 - https://dev.to/aadarsh-nagrath/setting-up-https-on-kubernetes-with-cert-manager-and-lets-encrypt-45e6
@@ -140,6 +140,6 @@ For reference, I helped myself with these for AKS:
 Both pipelines trigger on push to `main`: build Docker image → push to Docker Hub → deploy to Scaleway/AKS/ACA/Web App.
 
 - **GitHub Actions**: `.github/workflows/ci-cd.yml`
-- **Azure DevOps**: `azure/azure-pipelines.yml` — includes separate stages for ACA and Azure Web App (both triggered on push to `main`). Set the `WEBAPP_NAME` pipeline variable (and add it to the `Release` variable group alongside `SUPABASE_URL`, `SUPABASE_KEY`, `DOCKERHUB_USERNAME`, `DOCKERHUB_PASSWORD`) to enable the Web App stage.
+- **Azure DevOps**: `azure/azure-pipelines.yml`
 
 **You are ready to create your own ranking!**

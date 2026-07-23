@@ -107,7 +107,7 @@ deploy_aca() {
             --resource-group "$RG" \
             --image julescrevola/linkedin-games:latest \
             --set-env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
-        echo "Deployment complete. Access the application at https://$DOMAIN"
+        echo "Deployment complete. Access the application at https://$DOMAIN if you have set up the custom domain already, or at https://$IP_ADDRESS and set up the custom domain with the `host_aca` function if you have one."
     else
         az containerapp create \
             --name "$ACA_NAME" \
@@ -122,7 +122,7 @@ deploy_aca() {
             --secrets supabase-url="$SUPABASE_URL" supabase-key="$SUPABASE_KEY" \
             --env-vars SUPABASE_URL=secretref:supabase-url SUPABASE_KEY=secretref:supabase-key
         IP_ADDRESS=$(nslookup $(az containerapp show --name "$ACA_NAME" --resource-group "$RG" --query properties.configuration.ingress.fqdn -o tsv) | grep 'Address' | tail -n1 | awk '{print $2}')
-        echo "Deployment complete. Change the DNS records to point to the new Container App IP address : $IP_ADDRESS, and access the application at https://$DOMAIN"
+        echo "Deployment complete. Access the application at https://$DOMAIN if you have set up the custom domain already, or at https://$IP_ADDRESS and set up the custom domain with the `host_aca` function if you have one."
     fi
 }
 
@@ -333,12 +333,10 @@ deploy_webapp() {
             --name "$WEBAPP_NAME" \
             --resource-group "$RG" \
             --container-image-name "julescrevola/linkedin-games:latest" \
-            --container-registry-url "https://index.docker.io" \
-            --container-registry-user "$DOCKERHUB_USERNAME" \
-            --container-registry-password "$DOCKERHUB_PASSWORD"
+            --container-registry-url "https://index.docker.io"
 
         az webapp restart --name "$WEBAPP_NAME" --resource-group "$RG"
-        echo "Deployment updated. Access the application at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv)"
+        echo "Deployment complete. Access the application at https://$DOMAIN if you have set up the custom domain already, or at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv) and set up the custom domain with the `host_webapp` function if you have one."
     else
         az appservice plan create \
             --name "${WEBAPP_NAME}-plan" \
@@ -359,12 +357,79 @@ deploy_webapp() {
                 SUPABASE_URL="$SUPABASE_URL" \
                 SUPABASE_KEY="$SUPABASE_KEY" \
                 WEBSITES_PORT=8000 \
-                DOCKER_REGISTRY_SERVER_URL="https://index.docker.io" \
-                DOCKER_REGISTRY_SERVER_USERNAME="$DOCKERHUB_USERNAME" \
-                DOCKER_REGISTRY_SERVER_PASSWORD="$DOCKERHUB_PASSWORD"
+                DOCKER_REGISTRY_SERVER_URL="https://index.docker.io"
 
-        echo "Deployment complete. Access the application at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv)"
+        az webapp restart --name "$WEBAPP_NAME" --resource-group "$RG"
+        echo "Deployment complete. Access the application at https://$DOMAIN if you have set up the custom domain already, or at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv) and set up the custom domain with the `host_webapp` function if you have one."
     fi
+}
+
+host_webapp() {
+    echo "▶ Fetching Web App IP and domain verification ID..."
+    WEBAPP_IP=$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query "outboundIpAddresses" -o tsv | cut -d',' -f1)
+    WEBAPP_VERIFY_ID=$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query "customDomainVerificationId" -o tsv)
+
+    if [[ -z "$WEBAPP_IP" || -z "$WEBAPP_VERIFY_ID" ]]; then
+        echo "Could not retrieve Web App IP or verification ID. Make sure the Web App exists."
+        return 1
+    fi
+
+    upsert_a_record() {
+        local record_name="$1"
+        local record_ip="$2"
+
+        az network dns record-set a create \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" --ttl 300 >/dev/null
+        az network dns record-set a update \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" \
+            --set aRecords=[] >/dev/null
+        az network dns record-set a add-record \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" -a "$record_ip" >/dev/null
+    }
+
+    upsert_txt_record() {
+        local record_name="$1"
+        local txt_value="$2"
+
+        az network dns record-set txt create \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" --ttl 300 >/dev/null
+        az network dns record-set txt update \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" \
+            --set txtRecords=[] >/dev/null
+        az network dns record-set txt add-record \
+            -g "$DNS_ZONE_RG" -z "$DNS_ZONE_NAME" -n "$record_name" --value "$txt_value" >/dev/null
+    }
+
+    echo "▶ Creating/updating @ and www A records in Azure DNS..."
+    upsert_a_record "@" "$WEBAPP_IP"
+    upsert_a_record "www" "$WEBAPP_IP"
+
+    echo "▶ Creating/updating asuid TXT record..."
+    upsert_txt_record "asuid" "$WEBAPP_VERIFY_ID"
+
+    echo "✅ DNS records configured"
+
+    echo "▶ Adding custom domain to Web App..."
+    az webapp config hostname add \
+        --webapp-name "$WEBAPP_NAME" \
+        --resource-group "$RG" \
+        --hostname "$DOMAIN"
+
+    echo "▶ Creating and binding managed TLS certificate..."
+    az webapp config ssl create \
+        --resource-group "$RG" \
+        --name "$WEBAPP_NAME" \
+        --hostname "$DOMAIN"
+
+    az webapp config ssl bind \
+        --resource-group "$RG" \
+        --name "$WEBAPP_NAME" \
+        --certificate-type managed \
+        --ssl-type SNI \
+        --hostname "$DOMAIN"
+
+    echo "It can take a few minutes for the certificate to be issued."
+    echo "✅ Done. Access the application at https://$DOMAIN"
 }
 
 # Export the functions to make them available in the shell
@@ -376,5 +441,6 @@ export -f docker_build_push
 export -f deploy_aca
 export -f host_aca
 export -f deploy_webapp
+export -f host_webapp
 export -f dev_api
 export -f dev_frontend
