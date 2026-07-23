@@ -149,7 +149,7 @@ stages:
     displayName: Deploy to Azure Web App (container)
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'linkedin_games_ranking_webapp'
+    environment: 'linkedin_games_ranking'
     variables:
       - group: Release
     strategy:
