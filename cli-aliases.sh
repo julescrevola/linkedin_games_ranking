@@ -315,6 +315,58 @@ host_aks() {
     echo "Once everything is ready, access the application at https://$DOMAIN"
 }
 
+deploy_webapp() {
+    # Build and push to Docker
+    docker_build_push
+    # Deploy to Azure Web App (container)
+    echo "Deploying to Azure Web App..."
+    if az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" >/dev/null 2>&1; then
+        az webapp config appsettings set \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RG" \
+            --settings \
+                SUPABASE_URL="$SUPABASE_URL" \
+                SUPABASE_KEY="$SUPABASE_KEY" \
+                WEBSITES_PORT=8000
+
+        az webapp config container set \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RG" \
+            --container-image-name "julescrevola/linkedin-games:latest" \
+            --container-registry-url "https://index.docker.io" \
+            --container-registry-user "$DOCKERHUB_USERNAME" \
+            --container-registry-password "$DOCKERHUB_PASSWORD"
+
+        az webapp restart --name "$WEBAPP_NAME" --resource-group "$RG"
+        echo "Deployment updated. Access the application at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv)"
+    else
+        az appservice plan create \
+            --name "${WEBAPP_NAME}-plan" \
+            --resource-group "$RG" \
+            --sku B1 \
+            --is-linux
+
+        az webapp create \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RG" \
+            --plan "${WEBAPP_NAME}-plan" \
+            --deployment-container-image-name "julescrevola/linkedin-games:latest"
+
+        az webapp config appsettings set \
+            --name "$WEBAPP_NAME" \
+            --resource-group "$RG" \
+            --settings \
+                SUPABASE_URL="$SUPABASE_URL" \
+                SUPABASE_KEY="$SUPABASE_KEY" \
+                WEBSITES_PORT=8000 \
+                DOCKER_REGISTRY_SERVER_URL="https://index.docker.io" \
+                DOCKER_REGISTRY_SERVER_USERNAME="$DOCKERHUB_USERNAME" \
+                DOCKER_REGISTRY_SERVER_PASSWORD="$DOCKERHUB_PASSWORD"
+
+        echo "Deployment complete. Access the application at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv)"
+    fi
+}
+
 # Export the functions to make them available in the shell
 export -f envc
 export -f enva
@@ -323,5 +375,6 @@ export -f host_aks
 export -f docker_build_push
 export -f deploy_aca
 export -f host_aca
+export -f deploy_webapp
 export -f dev_api
 export -f dev_frontend
