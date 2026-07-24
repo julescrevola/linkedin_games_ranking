@@ -58,7 +58,7 @@ stages:
 #           - task: AzureCLI@2
 #             displayName: Deploy to Azure Container App
 #             inputs:
-#               azureSubscription: service-connection-linkedin-games-ranking
+#               azureSubscription: service-connection-azure-linkedin-games-ranking
 #               scriptType: bash
 #               scriptLocation: inlineScript
 #               inlineScript: |
@@ -102,7 +102,7 @@ stages:
           # - task: AzureCLI@2
           #   displayName: Create Kubernetes secret
           #   inputs:
-          #     azureSubscription: service-connection-linkedin-games-ranking
+          #     azureSubscription: service-connection-azure-linkedin-games-ranking
           #     scriptType: bash
           #     scriptLocation: inlineScript
           #     inlineScript: |
@@ -122,7 +122,7 @@ stages:
           #     connectionType: azureResourceManager
           #     secretName: $(imagePullSecret)
           #     dockerRegistryEndpoint: 'service-connection-docker'
-          #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
+          #     azureSubscriptionConnection: 'service-connection-azure-linkedin-games-ranking'
           #     azureResourceGroup: "$(ResourceGroup)"
           #     kubernetesCluster: "$(aksAppName)"
           #     namespace: 'default'
@@ -132,7 +132,7 @@ stages:
           #   inputs:
           #     action: deploy
           #     connectionType: azureResourceManager
-          #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
+          #     azureSubscriptionConnection: 'service-connection-azure-linkedin-games-ranking'
           #     azureResourceGroup: "$(ResourceGroup)"
           #     kubernetesCluster: "$(aksAppName)"
           #     namespace: 'default'
@@ -164,7 +164,7 @@ stages:
           - task: AzureCLI@2
             displayName: Deploy container to Azure Web App
             inputs:
-              azureSubscription: service-connection-linkedin-games-ranking
+              azureSubscription: service-connection-azure-linkedin-games-ranking
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
