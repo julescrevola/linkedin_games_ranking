@@ -87,7 +87,7 @@ The API runs on `http://localhost:8000` and the frontend on `http://localhost:51
 
 ## Deploy to your own Kubernetes cluster, Azure Container App, or Azure Web App
 
-**This repo supports [Azure Container Apps](https://learn.microsoft.com/fr-fr/azure/container-apps/), [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), and [Azure App Service (Web Apps)](https://learn.microsoft.com/en-us/azure/app-service/), feel free to provision infrastructure with another method and change the code accordingly for your usage.**
+**This repo supports [Azure Container Apps](https://learn.microsoft.com/fr-fr/azure/container-apps/), [Azure Kubernetes Services](https://learn.microsoft.com/en-us/azure/aks/), and [Azure App Service (Web App)](https://learn.microsoft.com/en-us/azure/app-service/), feel free to provision infrastructure with another method and change the code accordingly for your usage.**
 
 First, [install Docker Engine](https://docs.docker.com/engine/install/) if you are on Linux, or [install Docker Desktop](https://docs.docker.com/desktop/) if you are on Windows or Mac.
 

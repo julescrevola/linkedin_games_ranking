@@ -62,7 +62,7 @@ deploy_aks() {
 
         echo "Creating new deployment..."
         echo "Getting AKS credentials..." # // codespell:ignore
-        az aks get-credentials --resource-group rg-linkedin_games --name linkedin_games_ranking # // codespell:ignore aks
+        az aks get-credentials --resource-group $RG --name $AKS_NAME # // codespell:ignore aks
 
         echo "Applying Kubernetes deployment..."
         kubectl apply -f deployment.yaml

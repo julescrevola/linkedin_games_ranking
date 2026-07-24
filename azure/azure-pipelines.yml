@@ -7,6 +7,7 @@ variables:
   tag: '$(Build.BuildId)'
   imagePullSecret: 'secret'
   acaAppName: $(ACA_NAME)
+  aksAppName: $(AKS_NAME)
   webAppName: $(WEBAPP_NAME)
   ResourceGroup: $(RG)
   acaEnvironment: $(ACA_ENV_NAME)
@@ -105,8 +106,8 @@ stages:
           #     scriptLocation: inlineScript
           #     inlineScript: |
           #       az aks get-credentials \
-          #         --resource-group rg-linkedin_games \
-          #         --name linkedin_games_ranking \
+          #         --resource-group "$(ResourceGroup)" \
+          #         --name "$(aksAppName)" \
           #         --overwrite-existing
           #
           #       kubectl create secret generic streamlit-secrets \
@@ -121,8 +122,8 @@ stages:
           #     secretName: $(imagePullSecret)
           #     dockerRegistryEndpoint: 'service-connection-docker'
           #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
-          #     azureResourceGroup: 'rg-linkedin_games'
-          #     kubernetesCluster: 'linkedin_games_ranking'
+          #     azureResourceGroup: "$(ResourceGroup)"
+          #     kubernetesCluster: "$(aksAppName)"
           #     namespace: 'default'
           #
           # - task: KubernetesManifest@1
@@ -131,8 +132,8 @@ stages:
           #     action: deploy
           #     connectionType: azureResourceManager
           #     azureSubscriptionConnection: 'service-connection-linkedin-games-ranking'
-          #     azureResourceGroup: 'rg-linkedin_games'
-          #     kubernetesCluster: 'linkedin_games_ranking'
+          #     azureResourceGroup: "$(ResourceGroup)"
+          #     kubernetesCluster: "$(aksAppName)"
           #     namespace: 'default'
           #     manifests: |
           #       $(Pipeline.Workspace)/manifests/deployment.yaml
