@@ -9,6 +9,7 @@ variables:
   acaAppName: $(ACA_NAME)
   aksAppName: $(AKS_NAME)
   webAppName: $(WEBAPP_NAME)
+  webAppPlanName: $(WEBAPP_PLAN_NAME)
   ResourceGroup: $(RG)
   acaEnvironment: $(ACA_ENV_NAME)
   acaTargetPort: '8000'
@@ -168,6 +169,7 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 WEBAPP_NAME="$(webAppName)"
+                WEBAPP_PLAN_NAME="$(webAppPlanName)"
                 RESOURCE_GROUP="$(ResourceGroup)"
                 IMAGE="$(linkedinGamesRankingRepository):$(tag)"
 
@@ -189,7 +191,7 @@ stages:
                   az webapp restart --name "$WEBAPP_NAME" --resource-group "$RESOURCE_GROUP"
                 else
                   az appservice plan create \
-                    --name "${WEBAPP_NAME}-plan" \
+                    --name "$WEBAPP_PLAN_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
                     --sku B1 \
                     --is-linux
@@ -197,7 +199,7 @@ stages:
                   az webapp create \
                     --name "$WEBAPP_NAME" \
                     --resource-group "$RESOURCE_GROUP" \
-                    --plan "${WEBAPP_NAME}-plan" \
+                    --plan "$WEBAPP_PLAN_NAME" \
                     --deployment-container-image-name "$IMAGE"
 
                   az webapp config appsettings set \

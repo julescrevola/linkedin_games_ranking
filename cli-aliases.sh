@@ -339,7 +339,7 @@ deploy_webapp() {
         echo "Deployment complete. Access the application at https://$DOMAIN if you have set up the custom domain already, or at https://$(az webapp show --name "$WEBAPP_NAME" --resource-group "$RG" --query defaultHostName -o tsv) and set up the custom domain with the `host_webapp` function if you have one."
     else
         az appservice plan create \
-            --name "${WEBAPP_NAME}-plan" \
+            --name "$WEBAPP_PLAN_NAME" \
             --resource-group "$RG" \
             --sku B1 \
             --is-linux
@@ -347,7 +347,7 @@ deploy_webapp() {
         az webapp create \
             --name "$WEBAPP_NAME" \
             --resource-group "$RG" \
-            --plan "${WEBAPP_NAME}-plan" \
+            --plan "$WEBAPP_PLAN_NAME" \
             --deployment-container-image-name "julescrevola/linkedin-games:latest"
 
         az webapp config appsettings set \
