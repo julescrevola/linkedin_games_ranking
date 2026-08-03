@@ -31,7 +31,7 @@ export default function LeaderboardPage() {
   const dates = datesData?.dates ?? []
 
   // Default start date
-  const defaultStart = '2026-06-01'
+  const defaultStart = '2026-08-01'
   const effectiveDayFrom = dayFilter === 'All' ? (dayFrom ?? defaultStart) : undefined
   const effectiveDayTo = dayFilter === 'All' ? (dayTo ?? dates[0] ?? undefined) : undefined
 
@@ -81,7 +81,7 @@ export default function LeaderboardPage() {
             className="w-48 h-48 object-cover rounded-lg mx-auto"
           />
           <p className="text-sm text-gray-400 mt-2">
-            Antonio Roberto Ventura, 2026 Spring Champion
+            Antonio Roberto Ventura, 2026 Summer Champion
           </p>
         </div>
       </div>
