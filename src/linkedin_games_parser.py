@@ -169,7 +169,7 @@ def parse_date(date_str):
         fmt = "%d/%m/%Y %H:%M:%S"
 
     dt = datetime.datetime.strptime(date_str, fmt)
-    if dt.time() < datetime.time(9, 0, 0):
+    if dt.time() < datetime.time(9, 1, 0):
         dt -= datetime.timedelta(days=1)
 
     return dt.date()
